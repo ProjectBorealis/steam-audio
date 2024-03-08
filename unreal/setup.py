@@ -16,62 +16,157 @@
 
 import os
 import shutil
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.error
+import urllib.parse
 import zipfile
+import argparse
+import subprocess
 
-version = "4.5.2"
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--configuration', help="Build configuration.",
+                    choices=['debug', 'release'], type=str.lower, default='release')
+parser.add_argument('-t', '--toolchain', help="Compiler toolchain. (Windows only)",
+                    choices=['vs2013', 'vs2015', 'vs2017', 'vs2019', 'vs2022'], type=str.lower, default='vs2022')
+parser.add_argument(
+    '--all-platforms', help="Copy binaries for all available platforms.", action='store_true')
+parser.add_argument(
+    '--windows-x86', help="Copy binaries used for Windows x86.", action='store_true')
+parser.add_argument(
+    '--windows-x64', help="Copy binaries used for Windows x64.", action='store_true')
+parser.add_argument(
+    '--arm-v7a', help="Copy binaries used for android ARM v7a.", action='store_true')
+parser.add_argument(
+    '--arm-v8a', help="Copy binaries used for android ARM v8a.", action='store_true')
+parser.add_argument(
+    '--arm-x86', help="Copy binaries used for android x86.", action='store_true')
+parser.add_argument(
+    '--osx', help="Copy binaries used for osx.", action='store_true')
+parser.add_argument(
+    '--linux-x86', help="Copy binaries used for Linux x86.", action='store_true')
+parser.add_argument(
+    '--linux-x64', help="Copy binaries used for Linux x64.", action='store_true')
+parser.add_argument(
+    '--export', help="Export the plugin to specified UE plugins directory", default=None)
+parser.add_argument('--version', help="Use specific version.", default="4.5.2")
+parser.add_argument('--source', help="Build from source.", action='store_true')
+args = parser.parse_args()
 
-def download_file(url):
-    remote_file = urllib.request.urlopen(url)
-    with open(os.path.basename(url), "wb") as local_file:
-        while True:
-            data = remote_file.read(1024)
-            if not data:
-                break
-            local_file.write(data)
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+lib_export_dir = "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib"
 
-print("Downloading steamaudio_" + version + ".zip...")
-url = "https://github.com/ValveSoftware/steam-audio/releases/download/v" + version + "/steamaudio_" + version + ".zip"
-download_file(url)
+platforms = {"windows_x86": "windows-x86", "windows_x64": "windows-x64", "linux_x86": "linux-x86",
+             "linux_x64": "linux-x64", "osx": "osx", "arm_v7a": "android/armeabi-v7a", "arm_v8a": "android/arm64-v8a", "arm_x86": "android/x86"}
 
-print("Extracting steamaudio_" + version + ".zip...")
-with zipfile.ZipFile(os.path.basename(url), "r") as zip:
-	zip.extractall()
+platforms_to_use = set[str]()
+if args.all_platforms:
+    platforms_to_use = platforms.values
+else:
+    for key, platform in platforms.items():
+        if args.__dict__[key]:
+            platforms_to_use.add(platform)
 
 print("Creating directories...")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x86"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x86")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x64"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x64")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x86"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x86")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x64"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x64")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/osx"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/osx")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/armeabi-v7a"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/armeabi-v7a")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/arm64-v8a"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/arm64-v8a")
-if not os.path.exists("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/x86"):
-    os.makedirs("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/x86")
+for platform in platforms_to_use:
+    os.makedirs(os.path.join(lib_export_dir, platform), exist_ok=True)
 
-print("Copying files...")
-shutil.copy("steamaudio/lib/windows-x86/phonon.dll", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x86")
-shutil.copy("steamaudio/lib/windows-x64/phonon.dll", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x64")
-shutil.copy("steamaudio/lib/linux-x86/libphonon.so", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x86")
-shutil.copy("steamaudio/lib/linux-x64/libphonon.so", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/linux-x64")
-try:
-	shutil.rmtree("src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/osx/phonon.bundle")
-except:
-	pass
-shutil.copytree("steamaudio/lib/osx/phonon.bundle", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/osx/phonon.bundle")
-shutil.copy("steamaudio/lib/android-armv7/libphonon.so", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/armeabi-v7a")
-shutil.copy("steamaudio/lib/android-armv8/libphonon.so", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/arm64-v8a")
-shutil.copy("steamaudio/lib/android-x86/libphonon.so", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/android/x86")
+if args.source:
+    command = ["python", "get_dependencies.py",
+               "-t", args.toolchain, "--extra"]
+    ret = subprocess.call(command, cwd="../core/build")
+    if ret != 0:
+        print("Error getting dependencies!")
+        exit(ret)
 
-shutil.copy("steamaudio/lib/windows-x64/TrueAudioNext.dll", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x64")
-shutil.copy("steamaudio/lib/windows-x64/GPUUtilities.dll", "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib/windows-x64")
+    print("\n Building...")
+    command = ["python", "build.py", "-t",
+               args.toolchain, "-c", args.configuration]
+    ret = subprocess.call(command, cwd="../core/build")
+    if ret != 0:
+        print("Error building steamaudio!")
+        exit(ret)
+    print("Build succeeded!")
 
-print("Cleaning up...")
-shutil.rmtree("steamaudio")
+    if "windows-x64" in platforms_to_use:
+        shutil.copy("../core/build/windows-" + args.toolchain + "-x64/src/core/" + ("Release" if args.configuration == "release" else "Debug") + "/phonon.lib",
+                    os.path.join(lib_export_dir, "windows-x64"))
+        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/release/TrueAudioNext.dll"):
+            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/release/TrueAudioNext.dll",
+                        os.path.join(lib_export_dir, "windows-x64"))
+        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/release/GPUUtilities.dll"):
+            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/release/GPUUtilities.dll",
+                        os.path.join(lib_export_dir, "windows-x64"))
+
+    print("\nPackaging...")
+    command = ["python", "build.py", "-t", args.toolchain,
+               "-c", args.configuration, "-o", "package"]
+    ret = subprocess.call(command, cwd="../core/build")
+    if ret != 0:
+        print("Error packaging steamaudio!")
+        exit(ret)
+    print("Packaging succeeded!")
+else:
+    def download_file(url):
+        remote_file = urllib.request.urlopen(url)
+        with open(os.path.basename(url), "wb") as local_file:
+            while True:
+                data = remote_file.read(1024)
+                if not data:
+                    break
+                local_file.write(data)
+
+    print("Downloading steamaudio_" + args.version + ".zip...")
+    url = "https://github.com/ValveSoftware/steam-audio/releases/download/v" + \
+        args.version + "/steamaudio_" + args.version + ".zip"
+    download_file(url)
+
+    print("Extracting steamaudio_" + args.version + ".zip...")
+    with zipfile.ZipFile(os.path.basename(url), "r") as zip:
+        zip.extractall()
+
+    print("Copying files...")
+
+    if "windows-x86" in platforms_to_use:
+        shutil.copy("steamaudio/lib/windows-x86/phonon.dll",
+                    os.path.join(lib_export_dir, "windows-x86"))
+    if "windows-x64" in platforms_to_use:
+        shutil.copy("steamaudio/lib/windows-x64/phonon.dll",
+                    os.path.join(lib_export_dir, "windows-x64"))
+        shutil.copy("steamaudio/lib/windows-x64/TrueAudioNext.dll",
+                    os.path.join(lib_export_dir, "windows-x64"))
+        shutil.copy("steamaudio/lib/windows-x64/GPUUtilities.dll",
+                    os.path.join(lib_export_dir, "windows-x64"))
+    if "linux-x86" in platforms_to_use:
+        shutil.copy("steamaudio/lib/linux-x86/libphonon.so",
+                    os.path.join(lib_export_dir, "linux-x86"))
+    if "linux-x64" in platforms_to_use:
+        shutil.copy("steamaudio/lib/linux-x64/libphonon.so",
+                    os.path.join(lib_export_dir, "linux-x64"))
+    if "android/armeabi-v7a" in platforms_to_use:
+        shutil.copy("steamaudio/lib/android-armv7/libphonon.so",
+                    os.path.join(lib_export_dir, "android/armeabi-v7a"))
+    if "android/armeabi-v8a" in platforms_to_use:
+        shutil.copy("steamaudio/lib/android-armv8/libphonon.so",
+                    os.path.join(lib_export_dir, "android/armeabi-v8a"))
+    if "android/x86" in platforms_to_use:
+        shutil.copy("steamaudio/lib/android-x86/libphonon.so",
+                    os.path.join(lib_export_dir, "android/x86"))
+
+    if "osx" in platforms_to_use:
+        osx_phonon_dest = os.path.join(lib_export_dir, "osx", "phonon.bundle")
+        if os.path.exists(osx_phonon_dest):
+            shutil.rmtree(osx_phonon_dest)
+        shutil.copytree("steamaudio/lib/osx/phonon.bundle", osx_phonon_dest)
+
+    print("Cleaning up...")
+    shutil.rmtree("steamaudio")
+
+if args.export and os.path.exists(args.export):
+    print("\nExporting plugins to " + args.export + "...")
+    plugins_local_dir = "src/SteamAudioUnreal/Plugins"
+    for plugin in os.listdir(plugins_local_dir):
+        target_dir = os.path.join(args.export, plugin)
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir)
+        shutil.copytree(os.path.join(plugins_local_dir, plugin), target_dir)
+    print("Done!")
