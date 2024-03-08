@@ -68,7 +68,7 @@ endif()
 # option(BUILD_SHARED_LIBS "Build shared libraries instead of static." ON)
 
 # Options for Unreal Engine version
-option(STEAMAUDIOUNREAL_TARGET_UE4 "Compile using target names for Unreal Engine 4.x." ON)
+option(STEAMAUDIOUNREAL_TARGET_UE4 "Compile using target names for Unreal Engine 4.x." OFF)
 
 # Cross-compiling options
 option(STEAMAUDIOUNREAL_CROSSCOMPILE_WIN32 "Cross-compile for Win32 on Win64." OFF)
