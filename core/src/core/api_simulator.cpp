@@ -55,6 +55,9 @@ CSimulator::CSimulator(CContext* context,
     auto _radeonRays = (settings->radeonRaysDevice) ? reinterpret_cast<CRadeonRaysDevice*>(settings->radeonRaysDevice)->mHandle.get() : nullptr;
     auto _tan = (settings->tanDevice) ? reinterpret_cast<CTrueAudioNextDevice*>(settings->tanDevice)->mHandle.get() : nullptr;
 
+    if (_indirectType == IndirectEffectType::TrueAudioNext && (!_tan || !_openCL))
+        throw Exception(Status::Failure);
+
     new (&mHandle) Handle<SimulationManager>(ipl::make_shared<SimulationManager>(_enableDirect, _enableIndirect, _enablePathing,
                                              _sceneType, _indirectType, settings->maxNumOcclusionSamples, settings->maxNumRays,
                                              settings->numDiffuseSamples, settings->maxDuration, settings->maxOrder,
