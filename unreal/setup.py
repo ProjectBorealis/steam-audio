@@ -97,14 +97,7 @@ if args.source:
             shutil.copy("../core/deps/trueaudionext/bin/windows-x64/release/GPUUtilities.dll",
                         os.path.join(lib_export_dir, "windows-x64"))
 
-    print("\nPackaging...")
-    command = ["python", "build.py", "-t", args.toolchain,
-               "-c", args.configuration, "-o", "package"]
-    ret = subprocess.call(command, cwd="../core/build")
-    if ret != 0:
-        print("Error packaging steamaudio!")
-        exit(ret)
-    print("Packaging succeeded!")
+    print("Copied steamaudio libraries to UE plugin source!")
 else:
     def download_file(url):
         remote_file = urllib.request.urlopen(url)
@@ -169,4 +162,7 @@ if args.export and os.path.exists(args.export):
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir)
         shutil.copytree(os.path.join(plugins_local_dir, plugin), target_dir)
+        os.remove(os.path.join(target_dir, plugin + ".uplugin.in"))
+        if os.path.exists(os.path.join(target_dir, "Config")):
+            shutil.rmtree(os.path.join(target_dir, "Config"))
     print("Done!")
