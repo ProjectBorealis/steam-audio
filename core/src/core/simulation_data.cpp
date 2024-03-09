@@ -74,6 +74,11 @@ SimulationData::SimulationData(bool enableIndirect,
 
         if (indirectType != IndirectEffectType::Parametric)
         {
+            if (indirectType == IndirectEffectType::TrueAudioNext)
+            {
+                if (!openCL || !tan)
+                    throw Exception(Status::Failure);
+            }
             reflectionState.impulseResponse = ImpulseResponseFactory::create(indirectType, maxDuration, maxOrder, samplingRate, openCL);
             reflectionState.impulseResponse->reset();
 
