@@ -31,7 +31,11 @@ unique_ptr<ImpulseResponse> ImpulseResponseFactory::create(IndirectEffectType in
 {
 #if defined(IPL_USES_TRUEAUDIONEXT)
     if (indirectType == IndirectEffectType::TrueAudioNext)
+    {
+        if (!openCL)
+            throw Exception(Status::Failure);
         return ipl::make_unique<OpenCLImpulseResponse>(openCL, duration, order, samplingRate);
+    }
 #endif
 
     return ipl::make_unique<ImpulseResponse>(duration, order, samplingRate);
