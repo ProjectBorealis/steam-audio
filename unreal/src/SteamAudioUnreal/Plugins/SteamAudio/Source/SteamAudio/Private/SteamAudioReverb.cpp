@@ -736,7 +736,7 @@ void FSteamAudioReverbSubmixPlugin::OnProcessAudio(const FSoundEffectSubmixInput
 
     LazyInit();
 
-    if (ReverbPlugin)
+    if (ReverbPlugin && (SimulationSettings.reflectionType != IPL_REFLECTIONEFFECTTYPE_TAN || SimulationSettings.tanDevice))
 	{
         ReverbPlugin->LazyInitMixer();
 
