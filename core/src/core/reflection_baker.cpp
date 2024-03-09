@@ -155,7 +155,7 @@ void ReflectionBaker::bake(const IScene& scene,
 
             threadPool.process(jobGraph);
 
-#if defined(IPL_USES_OPENCL)
+#if defined(IPL_USES_RADEONRAYS)
             if (sceneType == SceneType::RadeonRays)
             {
                 for (auto j = 0; j < numValidInBatch; ++j)

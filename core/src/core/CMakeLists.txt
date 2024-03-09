@@ -567,6 +567,8 @@ if (STEAMAUDIO_ENABLE_TRUEAUDIONEXT)
         tan_device.cpp
         tan_convolution_effect.h
         tan_convolution_effect.cpp
+        opencl_impulse_response.h
+        opencl_impulse_response.cpp
     )
 endif()
 

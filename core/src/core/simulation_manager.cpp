@@ -318,7 +318,7 @@ void SimulationManager::simulateIndirect()
         }
     }
 
-#if defined(IPL_USES_OPENCL)
+#if defined(IPL_USES_RADEONRAYS)
     if (mSceneType == SceneType::RadeonRays && mIndirectType != IndirectEffectType::TrueAudioNext)
     {
         for (auto i = 0; i < mRealTimeSources.size(); ++i)
