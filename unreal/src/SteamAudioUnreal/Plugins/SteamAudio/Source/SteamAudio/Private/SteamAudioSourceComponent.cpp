@@ -201,6 +201,8 @@ void USteamAudioSourceComponent::Shutdown(SteamAudio::FSteamAudioManager& Manage
 	{
 		return;
 	}
+
+    bIsStarted = false;
 	
 	if (AudioEngineSource)
 	{
