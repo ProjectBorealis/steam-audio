@@ -73,6 +73,8 @@ for platform in platforms_to_use:
 if args.source:
     command = ["python", "get_dependencies.py",
                "-t", args.toolchain, "--extra"]
+    if args.configuration == "debug":
+        command.append("--debug")
     ret = subprocess.call(command, cwd="../core/build")
     if ret != 0:
         print("Error getting dependencies!")
@@ -80,7 +82,7 @@ if args.source:
 
     print("\n Building...")
     command = ["python", "build.py", "-t",
-               args.toolchain, "-c", args.configuration]
+               args.toolchain, "-c", args.configuration, "-o", "ci_build"]
     ret = subprocess.call(command, cwd="../core/build")
     if ret != 0:
         print("Error building steamaudio!")
@@ -90,11 +92,20 @@ if args.source:
     if "windows-x64" in platforms_to_use:
         shutil.copy("../core/build/windows-" + args.toolchain + "-x64/src/core/" + ("Release" if args.configuration == "release" else "Debug") + "/phonon.lib",
                     os.path.join(lib_export_dir, "windows-x64"))
-        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/release/TrueAudioNext.dll"):
-            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/release/TrueAudioNext.dll",
+        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/" + args.configuration + "/TrueAudioNext.dll"):
+            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/" + args.configuration + "/TrueAudioNext.dll",
                         os.path.join(lib_export_dir, "windows-x64"))
-        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/release/GPUUtilities.dll"):
-            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/release/GPUUtilities.dll",
+        if os.path.exists("../core/deps/trueaudionext/bin/windows-x64/" + args.configuration + "/GPUUtilities.dll"):
+            shutil.copy("../core/deps/trueaudionext/bin/windows-x64/" + args.configuration + "/GPUUtilities.dll",
+                        os.path.join(lib_export_dir, "windows-x64"))
+        if os.path.exists("../core/deps/trueaudionext/lib/windows-x64/" + args.configuration + "/TrueAudioNext.lib"):
+            shutil.copy("../core/deps/trueaudionext/lib/windows-x64/" + args.configuration + "/TrueAudioNext.lib",
+                        os.path.join(lib_export_dir, "windows-x64"))
+        if os.path.exists("../core/deps/trueaudionext/lib/windows-x64/" + args.configuration + "/GPUUtilities.lib"):
+            shutil.copy("../core/deps/trueaudionext/lib/windows-x64/" + args.configuration + "/GPUUtilities.lib",
+                        os.path.join(lib_export_dir, "windows-x64"))
+        if args.configuration == "debug" and os.path.exists("../core/bin/symbols/windows-x64/phonon.pdb"):
+            shutil.copy("../core/bin/symbols/windows-x64/phonon.pdb",
                         os.path.join(lib_export_dir, "windows-x64"))
 
     print("Copied steamaudio libraries to UE plugin source!")
