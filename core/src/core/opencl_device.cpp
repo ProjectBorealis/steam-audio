@@ -146,54 +146,50 @@ void OpenCLDeviceList::enumerateAMF(OpenCLDeviceType type,
         if ((numCUsToReserve > 0 || requiresTAN) && !deviceCaps[i].supportsTAN)
             continue;
 
+        int numConvolutionCUs = 0;
+        int numIRUpdateCUs = 0;
         // This is the range of #CUs that can be reserved on this device.
         auto maxCUs = deviceCaps[i].maxReservableComputeUnits;
         auto granularity = deviceCaps[i].reserveComputeUnitsGranularity;
 
         // If the requested #CUs is valid but the device doesn't support CU reservation, skip it.
-        if (maxCUs == 0 || granularity == 0)
-            continue;
-
-        // If the maximum requested #CUs are less than minimum allocable CUs.
-        if (numCUsToReserve < granularity)
-            continue;
-
-        numCUsToReserve = std::min(numCUsToReserve, maxCUs);
-
-        auto cuFractionConvolution = (1.0f - fractionCUsForIRUpdate) * numCUsToReserve;
-        auto cuFractionIRUpdate = fractionCUsForIRUpdate * numCUsToReserve;
-
-        // The case where CUs cannot be split at all despite requiring reserved queues for TAN and IR Update.
-        if (cuFractionConvolution > 0.0f && cuFractionIRUpdate > 0.0f && granularity == numCUsToReserve)
-            continue;
-
-        int numConvolutionCUs = 0;
-        int numIRUpdateCUs = 0;
-
-        if (fractionCUsForIRUpdate == 0.0f)
+        // Also skip if the maximum requested #CUs are less than minimum allocable CUs.
+        if (maxCUs != 0 && granularity != 0 && numCUsToReserve >= granularity)
         {
-            numConvolutionCUs = numCUsToReserve;
-            numIRUpdateCUs = 0;
-        }
-        else if (fractionCUsForIRUpdate == 1.0f)
-        {
-            numConvolutionCUs = 0;
-            numIRUpdateCUs = numCUsToReserve;
-        }
-        else if (cuFractionConvolution < static_cast<float>(granularity))
-        {
-            numConvolutionCUs = granularity;
-            numIRUpdateCUs = numCUsToReserve - granularity;
-        }
-        else if (cuFractionIRUpdate < static_cast<float>(granularity))
-        {
-            numConvolutionCUs = numCUsToReserve - granularity;
-            numIRUpdateCUs = granularity;
-        }
-        else
-        {
-            numConvolutionCUs = static_cast<int>(ceilf(cuFractionConvolution) / granularity) * granularity;
-            numIRUpdateCUs = numCUsToReserve - numConvolutionCUs;
+            numCUsToReserve = std::min(numCUsToReserve, maxCUs);
+
+            auto cuFractionConvolution = (1.0f - fractionCUsForIRUpdate) * numCUsToReserve;
+            auto cuFractionIRUpdate = fractionCUsForIRUpdate * numCUsToReserve;
+
+            // The case where CUs cannot be split at all despite requiring reserved queues for TAN and IR Update.
+            if (cuFractionConvolution > 0.0f && cuFractionIRUpdate > 0.0f && granularity == numCUsToReserve)
+                continue;
+
+            if (fractionCUsForIRUpdate == 0.0f)
+            {
+                numConvolutionCUs = numCUsToReserve;
+                numIRUpdateCUs = 0;
+            }
+            else if (fractionCUsForIRUpdate == 1.0f)
+            {
+                numConvolutionCUs = 0;
+                numIRUpdateCUs = numCUsToReserve;
+            }
+            else if (cuFractionConvolution < static_cast<float>(granularity))
+            {
+                numConvolutionCUs = granularity;
+                numIRUpdateCUs = numCUsToReserve - granularity;
+            }
+            else if (cuFractionIRUpdate < static_cast<float>(granularity))
+            {
+                numConvolutionCUs = numCUsToReserve - granularity;
+                numIRUpdateCUs = granularity;
+            }
+            else
+            {
+                numConvolutionCUs = static_cast<int>(ceilf(cuFractionConvolution) / granularity) * granularity;
+                numIRUpdateCUs = numCUsToReserve - numConvolutionCUs;
+            }
         }
 
         OpenCLDeviceDesc deviceDesc;
