@@ -395,8 +395,7 @@ void FSteamAudioReverbPlugin::ProcessSourceAudio(const FAudioPluginSourceInputDa
         iplAudioBufferDeinterleave(Context, InBufferData, &Source.InBuffer);
         iplAudioBufferDownmix(Context, &Source.InBuffer, &Source.MonoBuffer);
 
-        UAudioComponent* AudioComponent = UAudioComponent::GetAudioComponentFromID(InputData.AudioComponentId);
-        USteamAudioSourceComponent* SteamAudioSourceComponent = (AudioComponent) ? AudioComponent->GetOwner()->FindComponentByClass<USteamAudioSourceComponent>() : nullptr;
+        USteamAudioSourceComponent* SteamAudioSourceComponent = FSteamAudioModule::GetManager().GetSource(InputData.AudioComponentId);
 
         if (SteamAudioSourceComponent)
         {

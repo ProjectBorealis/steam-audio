@@ -334,14 +334,13 @@ void FSteamAudioSpatializationPlugin::ProcessAudio(const FAudioPluginSourceInput
 
     // Apply pathing if specified.
     if (Source.bApplyPathing && Source.HRTF && Source.PathEffect && Source.AmbisonicsDecodeEffect &&
-        Source.PathingInputBuffer.data && Source.PathingBuffer.data && Source.SpatializedPathingBuffer.data && Source.OutBuffer.data)
+        Source.PathingInputBuffer.data && Source.PathingBuffer.data && Source.SpatializedPathingBuffer.data && Source.OutBuffer.data && FSteamAudioModule::IsPlaying())
     {
         // FIXME: Unreal 4.27 does not pass the audio component id correctly to the spatializer plugin. It does this
         // correctly for the occlusion and reverb plugins.
-        UAudioComponent* AudioComponent = UAudioComponent::GetAudioComponentFromID(InputData.AudioComponentId);
-        USteamAudioSourceComponent* SteamAudioSourceComponent = (AudioComponent) ? AudioComponent->GetOwner()->FindComponentByClass<USteamAudioSourceComponent>() : nullptr;
+        USteamAudioSourceComponent* SteamAudioSourceComponent = FSteamAudioModule::GetManager().GetSource(InputData.AudioComponentId);
 
-        if (SteamAudioSourceComponent && FSteamAudioModule::IsPlaying())
+        if (SteamAudioSourceComponent)
         {
             IPLSimulationSettings SimulationSettings = FSteamAudioModule::GetManager().GetRealTimeSettings(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
 

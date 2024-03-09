@@ -131,6 +131,9 @@ public:
     /** Unregisters a Steam Audio Source component from simulation. */
     void RemoveSource(USteamAudioSourceComponent* Source);
 
+    /** Retrieves a Steam Audio Source component on the given actor if it exists. */
+	USteamAudioSourceComponent* GetSource(uint64_t AudioComponentID) const;
+
     /** Registers a Steam Audio Listener component for simulation. */
     void AddListener(USteamAudioListenerComponent* Listener);
 
@@ -187,7 +190,7 @@ private:
     TMap<FString, int> DynamicObjectRefCounts;
 
     /** Steam Audio Source components that are currently registered for simulation. */
-    TSet<USteamAudioSourceComponent*> Sources;
+    TMap<uint32_t, USteamAudioSourceComponent*> Sources;
 
     /** Steam Audio Listener components that are currently registered for simulation. */
     TSet<USteamAudioListenerComponent*> Listeners;

@@ -604,14 +604,28 @@ void FSteamAudioManager::UnloadDynamicObject(USteamAudioDynamicObjectComponent* 
 
 void FSteamAudioManager::AddSource(USteamAudioSourceComponent* Source)
 {
-    check(Source);
-    Sources.Add(Source);
+    check(Source && Source->GetOwner());
+	FScopeLock Lock(&UAudioComponent::AudioIDToComponentMapLock);
+    Sources.Add(Source->GetOwner()->GetUniqueID(), Source);
 }
 
 void FSteamAudioManager::RemoveSource(USteamAudioSourceComponent* Source)
 {
-    check(Source);
-    Sources.Remove(Source);
+    check(Source && Source->GetOwner());
+	FScopeLock Lock(&UAudioComponent::AudioIDToComponentMapLock);
+    Sources.Remove(Source->GetOwner()->GetUniqueID());
+}
+
+USteamAudioSourceComponent* FSteamAudioManager::GetSource(uint64_t AudioComponentID) const
+{
+	FScopeLock Lock(&UAudioComponent::AudioIDToComponentMapLock);
+	const UAudioComponent* AudioComponent = UAudioComponent::AudioIDToComponentMap.FindRef(AudioComponentID);
+	if (!AudioComponent || !AudioComponent->GetOwner())
+	{
+		return nullptr;
+	}
+	
+	return Sources.FindRef(AudioComponent->GetOwner()->GetUniqueID());
 }
 
 void FSteamAudioManager::AddListener(USteamAudioListenerComponent* Listener)

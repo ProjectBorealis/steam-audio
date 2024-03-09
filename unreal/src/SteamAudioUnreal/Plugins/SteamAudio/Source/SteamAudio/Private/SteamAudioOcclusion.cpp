@@ -228,18 +228,17 @@ void FSteamAudioOcclusionPlugin::ProcessAudio(const FAudioPluginSourceInputData&
         // component.
         if (Source.bApplyOcclusion)
         {
-            UAudioComponent* AudioComponent = UAudioComponent::GetAudioComponentFromID(InputData.AudioComponentId);
-            USteamAudioSourceComponent* SteamAudioSourceComponent = (AudioComponent) ? AudioComponent->GetOwner()->FindComponentByClass<USteamAudioSourceComponent>() : nullptr;
+            USteamAudioSourceComponent* SteamAudioSourceComponent = FSteamAudioModule::GetManager().GetSource(InputData.AudioComponentId);
 
-            Params.occlusion = (SteamAudioSourceComponent) ? SteamAudioSourceComponent->OcclusionValue : 1.0f;
+            Params.occlusion = SteamAudioSourceComponent ? SteamAudioSourceComponent->OcclusionValue : 1.0f;
 
             if (Source.bApplyTransmission)
             {
                 Params.transmissionType = static_cast<IPLTransmissionType>(Source.TransmissionType);
 
-                Params.transmission[0] = (SteamAudioSourceComponent) ? SteamAudioSourceComponent->TransmissionLowValue : 1.0f;
-                Params.transmission[1] = (SteamAudioSourceComponent) ? SteamAudioSourceComponent->TransmissionMidValue : 1.0f;
-                Params.transmission[2] = (SteamAudioSourceComponent) ? SteamAudioSourceComponent->TransmissionHighValue : 1.0f;
+                Params.transmission[0] = SteamAudioSourceComponent ? SteamAudioSourceComponent->TransmissionLowValue : 1.0f;
+                Params.transmission[1] = SteamAudioSourceComponent ? SteamAudioSourceComponent->TransmissionMidValue : 1.0f;
+                Params.transmission[2] = SteamAudioSourceComponent ? SteamAudioSourceComponent->TransmissionHighValue : 1.0f;
             }
         }
 
