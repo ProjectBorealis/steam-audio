@@ -66,13 +66,13 @@ public:
 	USteamAudioListenerComponent();
 
     /** Sets simulation inputs. */
-	void SetInputs();
+	void SetInputs(IPLSimulationFlags Flags);
 
     /** Retrieves simulation outputs. */
 	IPLSimulationOutputs GetOutputs();
 
     /** Updates component properties based on simulation outputs. */
-	void UpdateOutputs();
+	void UpdateOutputs(IPLSimulationFlags Flags);
 
     /** Returns the baked data identifier for this source. */
     IPLBakedDataIdentifier GetBakedDataIdentifier() const;

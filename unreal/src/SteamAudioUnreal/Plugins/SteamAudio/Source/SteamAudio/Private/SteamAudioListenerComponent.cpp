@@ -39,18 +39,13 @@ USteamAudioListenerComponent::USteamAudioListenerComponent()
 	, PlayerController(nullptr)
 {}
 
-void USteamAudioListenerComponent::SetInputs()
+void USteamAudioListenerComponent::SetInputs(IPLSimulationFlags Flags)
 {
 	SteamAudio::FSteamAudioManager& Manager = SteamAudio::FSteamAudioModule::GetManager();
 	if (!Manager.IsInitialized() || !Source)
 		return;
 
     IPLSimulationInputs Inputs{};
-
-    if (bSimulateReverb)
-    {
-        Inputs.flags = IPL_SIMULATIONFLAGS_REFLECTIONS;
-    }
 
 	if (PlayerController)
 	{
@@ -85,10 +80,20 @@ void USteamAudioListenerComponent::SetInputs()
     Inputs.hybridReverbOverlapPercent = Manager.GetSteamAudioSettings().HybridReverbOverlapPercent / 100.0f;
     Inputs.baked = (ReverbType != EReverbSimulationType::REALTIME) ? IPL_TRUE : IPL_FALSE;
 
-    Inputs.bakedDataIdentifier.type = IPL_BAKEDDATATYPE_REFLECTIONS;
-    Inputs.bakedDataIdentifier.variation = IPL_BAKEDDATAVARIATION_REVERB;
+	if (ReverbType != EReverbSimulationType::BAKED)
+	{
+		Inputs.bakedDataIdentifier = GetBakedDataIdentifier();
+	}
 
-    iplSourceSetInputs(Source, IPL_SIMULATIONFLAGS_REFLECTIONS, &Inputs);
+	Inputs.flags = static_cast<IPLSimulationFlags>(0);
+	if (bSimulateReverb)
+	{
+		Inputs.flags = static_cast<IPLSimulationFlags>(Inputs.flags | IPL_SIMULATIONFLAGS_REFLECTIONS);
+	}
+
+	Inputs.directFlags = static_cast<IPLDirectSimulationFlags>(0);
+
+    iplSourceSetInputs(Source, Flags, &Inputs);
 }
 
 IPLSimulationOutputs USteamAudioListenerComponent::GetOutputs()
@@ -103,7 +108,7 @@ IPLSimulationOutputs USteamAudioListenerComponent::GetOutputs()
 	return Outputs;
 }
 
-void USteamAudioListenerComponent::UpdateOutputs()
+void USteamAudioListenerComponent::UpdateOutputs(IPLSimulationFlags Flags)
 {}
 
 IPLBakedDataIdentifier USteamAudioListenerComponent::GetBakedDataIdentifier() const

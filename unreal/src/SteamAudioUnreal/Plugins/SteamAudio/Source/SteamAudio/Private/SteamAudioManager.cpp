@@ -656,44 +656,56 @@ void FSteamAudioManager::Tick(float DeltaTime)
 
     iplSimulatorSetSharedInputs(Simulator, IPL_SIMULATIONFLAGS_DIRECT, &SharedInputs);
 
-    for (USteamAudioSourceComponent* Source : Sources)
+    for (const auto& Source : Sources)
     {
-        Source->SetInputs(IPL_SIMULATIONFLAGS_DIRECT);
+        Source.Value->SetInputs(IPL_SIMULATIONFLAGS_DIRECT);
+    }
+
+    for (USteamAudioListenerComponent* Listener : Listeners)
+    {
+        Listener->SetInputs(IPL_SIMULATIONFLAGS_DIRECT);
     }
 
     iplSimulatorRunDirect(Simulator);
 
-    for (USteamAudioSourceComponent* Source : Sources)
+    for (const auto& Source : Sources)
     {
-        Source->UpdateOutputs(IPL_SIMULATIONFLAGS_DIRECT);
+        Source.Value->UpdateOutputs(IPL_SIMULATIONFLAGS_DIRECT);
+    }
+
+    for (USteamAudioListenerComponent* Listener : Listeners)
+    {
+        Listener->UpdateOutputs(IPL_SIMULATIONFLAGS_DIRECT);
     }
 
     SimulationUpdateTimeElapsed += DeltaTime;
     if (SimulationUpdateTimeElapsed < SteamAudioSettings.SimulationUpdateInterval)
         return;
+    
+    SimulationUpdateTimeElapsed = 0.f;
 
     if (ThreadPool && ThreadPoolIdle)
     {
-        for (USteamAudioSourceComponent* Source : Sources)
+        for (const auto& Source : Sources)
         {
-            Source->UpdateOutputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
+            Source.Value->UpdateOutputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
 
         for (USteamAudioListenerComponent* Listener : Listeners)
         {
-            Listener->UpdateOutputs();
+            Listener->UpdateOutputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
 
         iplSimulatorSetSharedInputs(Simulator, static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING), &SharedInputs);
 
-        for (USteamAudioSourceComponent* Source : Sources)
+        for (const auto& Source : Sources)
         {
-            Source->SetInputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
+            Source.Value->SetInputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
 
         for (USteamAudioListenerComponent* Listener : Listeners)
         {
-            Listener->SetInputs();
+            Listener->SetInputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
 
         ThreadPoolIdle = false;
