@@ -411,6 +411,18 @@ void FSteamAudioManager::ShutDownSteamAudio(bool bResetFlags /* = true */)
     if (!bInitializationAttempted)
         return;
 
+	const auto ListenersToCleanUp = Listeners;
+	for (USteamAudioListenerComponent* Listener : ListenersToCleanUp)
+	{
+		Listener->Shutdown(*this);
+	}
+
+	const auto SourcesToCleanUp = Sources;
+	for (const auto& Source : SourcesToCleanUp)
+	{
+		Source.Value->Shutdown(*this);
+	}
+
     IAudioEngineState* AudioEngineState = FSteamAudioModule::GetAudioEngineState();
     if (AudioEngineState)
     {

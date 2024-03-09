@@ -163,6 +163,8 @@ void USteamAudioListenerComponent::BeginPlay()
 		return;
 	}
 
+	bIsStarted = true;
+
     iplSourceAdd(Source, Simulator);
 
 	Manager.AddListener(this);
@@ -176,20 +178,9 @@ void USteamAudioListenerComponent::BeginPlay()
 
 void USteamAudioListenerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	SteamAudio::IAudioEngineState* AudioEngineState = SteamAudio::FSteamAudioModule::GetAudioEngineState();
-	if (AudioEngineState)
-    {
-        AudioEngineState->SetReverbSource(nullptr);
-    }
-
-    SteamAudio::FSteamAudioManager& Manager = SteamAudio::FSteamAudioModule::GetManager();
-
-	if (Simulator && Source)
+	if (bIsStarted)
 	{
-        Manager.RemoveListener(this);
-        iplSourceRemove(Source, Simulator);
-        iplSourceRelease(&Source);
-        iplSimulatorRelease(&Simulator);
+		Shutdown(SteamAudio::FSteamAudioModule::GetManager());
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -198,4 +189,28 @@ void USteamAudioListenerComponent::EndPlay(const EEndPlayReason::Type EndPlayRea
 USteamAudioListenerComponent* USteamAudioListenerComponent::GetCurrentListener()
 {
 	return CurrentListener;
+}
+
+void USteamAudioListenerComponent::Shutdown(SteamAudio::FSteamAudioManager& Manager)
+{
+	if (!bIsStarted)
+	{
+		return;
+	}
+	
+	bIsStarted = false;
+	
+	SteamAudio::IAudioEngineState* AudioEngineState = SteamAudio::FSteamAudioModule::GetAudioEngineState();
+	if (AudioEngineState)
+	{
+		AudioEngineState->SetReverbSource(nullptr);
+	}
+
+	if (Simulator && Source)
+	{
+		Manager.RemoveListener(this);
+		iplSourceRemove(Source, Simulator);
+		iplSourceRelease(&Source);
+		iplSimulatorRelease(&Simulator);
+	}
 }

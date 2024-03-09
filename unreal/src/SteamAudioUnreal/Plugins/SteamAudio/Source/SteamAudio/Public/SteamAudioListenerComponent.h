@@ -89,6 +89,9 @@ public:
 	/** Returns the current (active) listener. */
 	static USteamAudioListenerComponent* GetCurrentListener();
 
+	/** Release steam audio resources */
+	void Shutdown(SteamAudio::FSteamAudioManager& Manager);
+
 protected:
 	/**
 	 * Inherited from UActorComponent
@@ -112,4 +115,6 @@ private:
 
 	/** The current listener. */
 	static USteamAudioListenerComponent* CurrentListener;
+
+	bool bIsStarted = false;
 };

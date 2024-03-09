@@ -195,6 +195,27 @@ IPLBakedDataIdentifier USteamAudioSourceComponent::GetBakedDataIdentifier() cons
     return Identifier;
 }
 
+void USteamAudioSourceComponent::Shutdown(SteamAudio::FSteamAudioManager& Manager)
+{
+	if (!bIsStarted)
+	{
+		return;
+	}
+	
+	if (AudioEngineSource)
+	{
+		AudioEngineSource->Destroy();
+	}
+
+	if (Simulator && Source)
+	{
+		Manager.RemoveSource(this);
+		iplSourceRemove(Source, Simulator);
+		iplSourceRelease(&Source);
+		iplSimulatorRelease(&Simulator);
+	}
+}
+
 #if WITH_EDITOR
 bool USteamAudioSourceComponent::CanEditChange(const FProperty* InProperty) const
 {
@@ -253,6 +274,8 @@ void USteamAudioSourceComponent::BeginPlay()
         iplSimulatorRelease(&Simulator);
         return;
     }
+	
+	bIsStarted = true;
 
     iplSourceAdd(Source, Simulator);
     Manager.AddSource(this);
@@ -270,19 +293,9 @@ void USteamAudioSourceComponent::BeginPlay()
 
 void USteamAudioSourceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (AudioEngineSource)
+    if (bIsStarted)
     {
-        AudioEngineSource->Destroy();
-    }
-
-    SteamAudio::FSteamAudioManager& Manager = SteamAudio::FSteamAudioModule::GetManager();
-
-    if (Simulator && Source)
-    {
-        Manager.RemoveSource(this);
-        iplSourceRemove(Source, Simulator);
-        iplSourceRelease(&Source);
-        iplSimulatorRelease(&Simulator);
+    	Shutdown(SteamAudio::FSteamAudioModule::GetManager());
     }
 
     Super::EndPlay(EndPlayReason);
