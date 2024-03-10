@@ -259,7 +259,7 @@ void USteamAudioSourceComponent::BeginPlay()
     Super::BeginPlay();
 
     SteamAudio::FSteamAudioManager& Manager = SteamAudio::FSteamAudioModule::GetManager();
-    if (!Manager.InitializeSteamAudio(SteamAudio::EManagerInitReason::PLAYING))
+    if (Manager.InitializedType() != SteamAudio::EManagerInitReason::PLAYING)
         return;
 
     Simulator = iplSimulatorRetain(Manager.GetSimulator());

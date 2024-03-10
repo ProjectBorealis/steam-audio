@@ -55,7 +55,7 @@ FSteamAudioManager::FSteamAudioManager()
     , TrueAudioNextDevice(nullptr)
     , Scene(nullptr)
     , Simulator(nullptr)
-    , bInitializationAttempted(false)
+    , InitializationAttempted(EManagerInitReason::NONE)
     , bInitializationSucceded(false)
     , SteamAudioSettings()
     , bSettingsLoaded(false)
@@ -184,10 +184,10 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
 {
     // We already tried initializing before, so just return a flag indicating whether or not we succeeded when we last
     // tried.
-    if (bInitializationAttempted)
+    if (InitializationAttempted == Reason)
         return bInitializationSucceded;
 
-    bInitializationAttempted = true;
+    InitializationAttempted = Reason;
 
     const USteamAudioSettings* Settings = GetDefault<USteamAudioSettings>();
     if (!Settings)
@@ -396,12 +396,9 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
                 UE_LOG(LogSteamAudio, Warning, TEXT("Unable to initialize TrueAudio Next device. [%d] Falling back to convolution."), Status);
             }
         }
-
-        if (AudioEngineState)
-        {
-            AudioEngineState->Initialize(Context, HRTF, SimulationSettings);
-        }
     }
+
+	OnInitialized.Broadcast(InitializationAttempted);
 
     bInitializationSucceded = true;
     return true;
@@ -409,26 +406,13 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
 
 void FSteamAudioManager::ShutDownSteamAudio(bool bResetFlags /* = true */)
 {
-    if (!bInitializationAttempted)
+    if (InitializationAttempted == EManagerInitReason::NONE)
         return;
 
-	const auto ListenersToCleanUp = Listeners;
-	for (USteamAudioListenerComponent* Listener : ListenersToCleanUp)
+	if (bInitializationSucceded)
 	{
-		Listener->Shutdown(*this);
+		OnShutDown.Broadcast(InitializationAttempted);
 	}
-
-	const auto SourcesToCleanUp = Sources;
-	for (const auto& Source : SourcesToCleanUp)
-	{
-		Source.Value->Shutdown(*this);
-	}
-
-    IAudioEngineState* AudioEngineState = FSteamAudioModule::GetAudioEngineState();
-    if (AudioEngineState)
-    {
-        AudioEngineState->Destroy();
-    }
 
     FSteamAudioModule::SetAudioEngineState(nullptr);
 
@@ -451,7 +435,7 @@ void FSteamAudioManager::ShutDownSteamAudio(bool bResetFlags /* = true */)
 
     if (bResetFlags)
     {
-        bInitializationAttempted = false;
+        InitializationAttempted = EManagerInitReason::NONE;
         bInitializationSucceded = false;
         bSettingsLoaded = false;
     }
@@ -660,7 +644,7 @@ TStatId FSteamAudioManager::GetStatId() const
 
 void FSteamAudioManager::Tick(float DeltaTime)
 {
-    if (!InitializeSteamAudio(EManagerInitReason::PLAYING))
+    if (InitializedType() != SteamAudio::EManagerInitReason::PLAYING)
         return;
 
     if (ThreadPool && ThreadPoolIdle)
@@ -711,7 +695,7 @@ void FSteamAudioManager::Tick(float DeltaTime)
     
     SimulationUpdateTimeElapsed = 0.f;
 
-    if (ThreadPool && ThreadPoolIdle)
+    if (ThreadPool && ThreadPoolIdle.exchange(false))
     {
         for (const auto& Source : Sources)
         {
@@ -734,8 +718,6 @@ void FSteamAudioManager::Tick(float DeltaTime)
         {
             Listener->SetInputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
-
-        ThreadPoolIdle = false;
 
         AsyncPool(*ThreadPool, [this]
         {

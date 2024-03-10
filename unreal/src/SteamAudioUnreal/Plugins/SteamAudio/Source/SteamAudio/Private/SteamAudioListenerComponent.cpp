@@ -79,11 +79,7 @@ void USteamAudioListenerComponent::SetInputs(IPLSimulationFlags Flags)
     Inputs.hybridReverbTransitionTime = Manager.GetSteamAudioSettings().HybridReverbTransitionTime;
     Inputs.hybridReverbOverlapPercent = Manager.GetSteamAudioSettings().HybridReverbOverlapPercent / 100.0f;
     Inputs.baked = (ReverbType != EReverbSimulationType::REALTIME) ? IPL_TRUE : IPL_FALSE;
-
-	if (ReverbType != EReverbSimulationType::BAKED)
-	{
-		Inputs.bakedDataIdentifier = GetBakedDataIdentifier();
-	}
+	Inputs.bakedDataIdentifier = GetBakedDataIdentifier();
 
 	Inputs.flags = static_cast<IPLSimulationFlags>(0);
 	if (bSimulateReverb)
@@ -145,7 +141,7 @@ void USteamAudioListenerComponent::BeginPlay()
 	PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 
 	SteamAudio::FSteamAudioManager& Manager = SteamAudio::FSteamAudioModule::GetManager();
-	if (!Manager.InitializeSteamAudio(SteamAudio::EManagerInitReason::PLAYING))
+	if (Manager.InitializedType() != SteamAudio::EManagerInitReason::PLAYING)
 		return;
 
     Simulator = iplSimulatorRetain(Manager.GetSimulator());
@@ -169,11 +165,7 @@ void USteamAudioListenerComponent::BeginPlay()
 
 	Manager.AddListener(this);
 
-	SteamAudio::IAudioEngineState* AudioEngineState = SteamAudio::FSteamAudioModule::GetAudioEngineState();
-	if (AudioEngineState)
-    {
-        AudioEngineState->SetReverbSource(Source);
-    }
+	FSubmixEffectSteamAudioReverbPlugin::SetReverbSource(Source);
 }
 
 void USteamAudioListenerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -200,11 +192,7 @@ void USteamAudioListenerComponent::Shutdown(SteamAudio::FSteamAudioManager& Mana
 	
 	bIsStarted = false;
 	
-	SteamAudio::IAudioEngineState* AudioEngineState = SteamAudio::FSteamAudioModule::GetAudioEngineState();
-	if (AudioEngineState)
-	{
-		AudioEngineState->SetReverbSource(nullptr);
-	}
+	FSubmixEffectSteamAudioReverbPlugin::SetReverbSource(nullptr);
 
 	if (Simulator && Source)
 	{
