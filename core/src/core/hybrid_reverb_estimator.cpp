@@ -49,6 +49,8 @@ void HybridReverbEstimator::estimate(const EnergyField& energyField,
 {
     PROFILE_FUNCTION();
 
+    transitionTime = min(transitionTime, mMaxDuration);
+
     auto numChannels = SphericalHarmonics::numCoeffsForOrder(order);
 
     auto cutoffBin = static_cast<int>(ceilf(((1.0f - overlapFraction) * transitionTime) / EnergyField::kBinDuration));
