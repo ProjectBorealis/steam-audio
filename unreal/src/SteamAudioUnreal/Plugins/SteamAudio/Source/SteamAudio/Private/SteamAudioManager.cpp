@@ -91,6 +91,7 @@ FSteamAudioManager::FSteamAudioManager()
 FSteamAudioManager::~FSteamAudioManager()
 {
     ShutDownSteamAudio();
+	iplContextRelease(&Context);
 }
 
 IPLCoordinateSpace3 FSteamAudioManager::GetListenerCoordinates()
