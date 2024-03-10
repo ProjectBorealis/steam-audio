@@ -49,7 +49,7 @@ void HybridReverbEstimator::estimate(const EnergyField& energyField,
 {
     PROFILE_FUNCTION();
 
-    transitionTime = min(transitionTime, mMaxDuration);
+    transitionTime = std::min(transitionTime, mMaxDuration);
 
     auto numChannels = SphericalHarmonics::numCoeffsForOrder(order);
 
