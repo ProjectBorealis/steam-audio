@@ -46,25 +46,21 @@ public:
 
     void commitWriteBuffer()
     {
-        if (!mNewDataWritten)
+        if (!mNewDataWritten.exchange(true))
         {
             shareBuffer.swap(writeBuffer);
-            mNewDataWritten = true;
         }
     }
 
     bool updateReadBuffer()
     {
-        auto newDataRead = false;
-
-        if (mNewDataWritten)
+        if (mNewDataWritten.exchange(false))
         {
             readBuffer.swap(shareBuffer);
-            newDataRead = true;
-            mNewDataWritten = false;
+            return true;
         }
 
-        return newDataRead;
+        return false;
     }
 
 private:
