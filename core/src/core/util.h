@@ -118,7 +118,7 @@ DEFINE_OPAQUE_HANDLE(IPLProbeBatch, ProbeBatch);
 DEFINE_OPAQUE_HANDLE(IPLSource, SimulationData);
 DEFINE_OPAQUE_HANDLE(IPLSimulator, SimulationManager);
 
-template <> struct HandleTraits<ipl::TripleBuffer<ipl::OverlapSaveFIR>> { typedef IPLReflectionEffectIR opaque_type; };
+// template <> struct HandleTraits<ipl::TripleBuffer<ipl::OverlapSaveFIR>> { typedef IPLReflectionEffectIR opaque_type; };
 
 template <typename T>
 typename HandleTraits<T>::opaque_type createHandle(shared_ptr<Context> context,

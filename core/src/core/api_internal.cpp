@@ -489,7 +489,7 @@ void IPLCALL iplImpulseResponseCopyDeviceToHost(IPLImpulseResponse impulseRespon
 // Indirect Effect IR
 // --------------------------------------------------------------------------------------------------------------------
 
-IPLerror IPLCALL iplIndirectEffectIRCreate(IPLContext context, IPLIndirectEffectIRSettings* settings, IPLReflectionEffectIR* ir)
+/*IPLerror IPLCALL iplIndirectEffectIRCreate(IPLContext context, IPLIndirectEffectIRSettings* settings, IPLReflectionEffectIR* ir)
 {
     if (!context || !settings || !ir)
         return IPL_STATUS_FAILURE;
@@ -525,7 +525,7 @@ IPLReflectionEffectIR IPLCALL iplIndirectEffectIRRetain(IPLReflectionEffectIR ir
 void IPLCALL iplIndirectEffectIRRelease(IPLReflectionEffectIR* ir)
 {
     releaseHandle<TripleBuffer<OverlapSaveFIR>>(*ir);
-}
+}*/
 
 
 // --------------------------------------------------------------------------------------------------------------------
