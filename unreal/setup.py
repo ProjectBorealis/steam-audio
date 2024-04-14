@@ -174,6 +174,4 @@ if args.export and os.path.exists(args.export):
             shutil.rmtree(target_dir)
         shutil.copytree(os.path.join(plugins_local_dir, plugin), target_dir)
         os.remove(os.path.join(target_dir, plugin + ".uplugin.in"))
-        if os.path.exists(os.path.join(target_dir, "Config")):
-            shutil.rmtree(os.path.join(target_dir, "Config"))
     print("Done!")
