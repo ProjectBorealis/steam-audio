@@ -23,6 +23,9 @@ import zipfile
 import argparse
 import subprocess
 
+
+version = "4.5.3"
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--configuration', help="Build configuration.",
                     choices=['debug', 'release'], type=str.lower, default='release')
@@ -48,7 +51,7 @@ parser.add_argument(
     '--linux-x64', help="Copy binaries used for Linux x64.", action='store_true')
 parser.add_argument(
     '--export', help="Export the plugin to specified UE plugins directory", default=None)
-parser.add_argument('--version', help="Use specific version.", default="4.5.2")
+parser.add_argument('--version', help="Use specific version.", default=version)
 parser.add_argument('--source', help="Build from source.", action='store_true')
 args = parser.parse_args()
 

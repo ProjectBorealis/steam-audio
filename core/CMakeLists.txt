@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.17)
 
-project(Phonon VERSION 4.5.2)
+project(Phonon VERSION 4.5.3)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_HOME_DIRECTORY}/build")
@@ -32,7 +32,7 @@ elseif (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(IPL_OS_MACOS TRUE)
 elseif (ANDROID)
     set(IPL_OS_ANDROID TRUE)
-elseif (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+elseif (APPLE AND (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "tvOS" OR CMAKE_SYSTEM_NAME STREQUAL "visionOS"))
     set(IPL_OS_IOS TRUE)
     if (CMAKE_XCODE_ATTRIBUTE_SDKROOT STREQUAL "iphonesimulator")
         set(IPL_IOS_SIMULATOR TRUE)
@@ -88,7 +88,7 @@ if (IPL_OS_WINDOWS AND IPL_CPU_X64)
     option(STEAMAUDIO_BUILD_DOCS "Build documentation." ON)
 endif()
 
-if (IPL_OS_WINDOWS AND (IPL_CPU_X86 OR IPL_CPU_X64))
+if ((IPL_OS_WINDOWS OR IPL_OS_LINUX) AND (IPL_CPU_X86 OR IPL_CPU_X64))
     option(STEAMAUDIO_ENABLE_AVX "Enable AVX intrinsics." ON)
 endif()
 
@@ -178,6 +178,9 @@ if (IPL_OS_LINUX)
     add_compile_options(-fPIC -g -fvisibility=hidden -Wl,--no-undefined)
     if (IPL_CPU_X86)
         add_compile_options(-m32 -mfpmath=sse -march=native)
+    endif()
+    if (STEAMAUDIO_ENABLE_AVX)
+        add_compile_options(-fabi-version=6)
     endif()
 endif()
 

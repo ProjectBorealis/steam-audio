@@ -24,8 +24,27 @@
 // float8
 // --------------------------------------------------------------------------------------------------------------------
 
+#if ( defined(__clang__) || defined(__GNUC__) ) && ( defined(IPL_CPU_X86) || defined(IPL_CPU_X64) )
+#define IPL_FLOAT8_ATTR __attribute__((target("avx")))
+#else
+#define IPL_FLOAT8_ATTR
+#endif
+
 #if defined(IPL_CPU_X86) || defined(IPL_CPU_X64)
 #include "avx_float8.h"
 #endif
 
 #endif
+
+namespace ipl {
+
+namespace float8
+{
+    template <typename T>
+    inline bool isAligned(const T* p)
+    {
+        return ((reinterpret_cast<size_t>(p) & 0x1f) == 0);
+    }
+}
+
+}

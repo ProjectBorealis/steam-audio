@@ -22,10 +22,8 @@
                 {
                     "platforms": ["osx"],
                     "flags": [
-                        "-DCMAKE_C_FLAGS=-Wno-error=unused-but-set-variable",
-                        "-DCMAKE_CXX_FLAGS=-Wno-error=unused-but-set-variable",
-                        "-DCMAKE_C_FLAGS=-Wno-unknown-warning-option",
-                        "-DCMAKE_CXX_FLAGS=-Wno-unknown-warning-option"
+                        "-DCMAKE_C_FLAGS=-Wno-error=unused-but-set-variable -Wno-unknown-warning-option",
+                        "-DCMAKE_CXX_FLAGS=-Wno-error=unused-but-set-variable -Wno-unknown-warning-option"
                     ]
                 }
             ]
@@ -301,7 +299,6 @@
                         "-DEMBREE_GEOMETRY_LINES=OFF",
                         "-DEMBREE_GEOMETRY_HAIR=OFF",
                         "-DEMBREE_GEOMETRY_SUBDIV=OFF",
-                        "-DEMBREE_GEOMETRY_USER=OFF",
                         "-DEMBREE_TASKING_SYSTEM=INTERNAL",
                         "-DEMBREE_MAX_ISA=AVX2"
                     ]
