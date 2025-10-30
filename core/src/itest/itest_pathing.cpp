@@ -37,6 +37,22 @@ struct PathingVisState
     std::vector<UIColor> color;
 };
 
+struct PathingCallbackUserData
+{
+    float minValue[Bands::kNumBands];
+};
+
+float IPL_CALLBACK CustomPathingCallback(float angle, int band, void* userData)
+{
+    if (!userData)
+        return 1.0f;
+
+    auto* _userData = reinterpret_cast<PathingCallbackUserData*>(userData);
+
+    auto x = std::min(angle / (2.0f * Math::kPi), 1.0f);
+    return (1.0f - x) * 1.0f + x * _userData->minValue[band];
+}
+
 ITEST(pathing)
 {
     auto context = make_shared<Context>(nullptr, nullptr, nullptr, SIMDLevel::AVX2, STEAMAUDIO_VERSION);
@@ -118,6 +134,7 @@ ITEST(pathing)
     Array<float>* coeffs[2] = {&readCoeffs, &writeCoeffs};
     Vector3f avgDirection(.0f, .0f, .0f);
     float distanceRatio = 1.0f;
+    float pathingDeviation = .0f;
     std::mutex mutex;
     std::atomic<bool> newDataWritten = false;
     const char* dragOptions[] = { "None", "Source", "Listener" };
@@ -127,6 +144,15 @@ ITEST(pathing)
     bool enableValidation = false;
     bool findAlternatePaths = false;
     bool enablePathVisualization = true;
+    bool normalizeEQ = false;
+    bool useCallback = false;
+    bool simplifyPaths = false;
+
+    PathingCallbackUserData userData{};
+    for (auto i = 0; i < Bands::kNumBands; i++)
+    {
+        userData.minValue[i] = 1.0f;
+    }
 
 	auto gui = [&]()
 	{
@@ -143,11 +169,22 @@ ITEST(pathing)
 
         ImGui::Combo("Drag Options", &selectedDragOption, dragOptions, IM_ARRAYSIZE(dragOptions));
 		ImGui::Checkbox("Show Mesh", &showMesh);
-        ImGui::Text("Distance Ratio: %.4f", distanceRatio );
+        ImGui::Text("Distance Ratio: %.4f", distanceRatio);
+        ImGui::Text("Total Deviation: %.4f", pathingDeviation);
         ImGui::Checkbox("Interpolate All Source Probes", &PathSimulator::sEnablePathsFromAllSourceProbes);
         ImGui::Checkbox("Enable Validation", &enableValidation);
         ImGui::Checkbox("Find Alternate Paths", &findAlternatePaths);
         ImGui::Checkbox("Enable Path Visualization", &enablePathVisualization);
+        ImGui::Checkbox("Normalize EQ", &normalizeEQ);
+        ImGui::Checkbox("Use Callback", &useCallback);
+        ImGui::Checkbox("Simplify Paths", &simplifyPaths);
+        for (auto i = 0; i < Bands::kNumBands; i++)
+        {
+            char label[64] = {};
+            sprintf(label, "Band %d", i);
+
+            ImGui::SliderFloat(label, &userData.minValue[i], 0.0f, 1.0f);
+        }
     };
 
     memset(readEQGains.flatData(), 0, Bands::kNumBands * sizeof(float));
@@ -227,9 +264,11 @@ ITEST(pathing)
                 visState.to.clear();
                 visState.color.clear();
 
+                auto deviationModel = (useCallback) ? DeviationModel(CustomPathingCallback, &userData) : DeviationModel{};
+
                 pathSimulator.findPaths(sourcePosition, listener, *scene, *probeBatch, sourceProbes, listenerProbes, kProbeVisRadius,
-                    kProbeVisThreshold, kProbeVisRangeRealTime, kOrder, enableValidation, findAlternatePaths, true, true,
-                    eqGains[1]->data(), coeffs[1]->data(), &avgDirection, &distanceRatio,
+                    kProbeVisThreshold, kProbeVisRangeRealTime, kOrder, enableValidation, findAlternatePaths, simplifyPaths, true,
+                    eqGains[1]->data(), coeffs[1]->data(), DistanceAttenuationModel{}, deviationModel, &avgDirection, & distanceRatio, & pathingDeviation,
                     enablePathVisualization ? visualizeValidationRay : (ValidationRayVisualizationCallback) nullptr, &visState);
 
                 newDataWritten = true;
@@ -294,6 +333,7 @@ ITEST(pathing)
         pathParams.eqCoeffs = eqGains[0]->data();
         pathParams.shCoeffs = coeffs[0]->data();
         pathParams.order = pathSettings.maxOrder;
+        pathParams.normalizeEQ = normalizeEQ;
 
         float* shCoeffs = coeffs[0]->data();
         float distanceScale = pathParams.shCoeffs[0] > .0f ? 1.0f / (2.0f * sqrtf( Math::kPi ) * pathParams.shCoeffs[0]) : 1.0f;

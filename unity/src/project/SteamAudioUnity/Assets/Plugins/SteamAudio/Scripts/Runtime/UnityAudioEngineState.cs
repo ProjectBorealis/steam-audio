@@ -49,13 +49,24 @@ namespace SteamAudio
         {
             API.iplUnitySetReverbSource(reverbSource.Get());
         }
+
+        public override void SetHRTFDisabled(bool disabled)
+        {
+            base.SetHRTFDisabled(disabled);
+
+            API.iplUnitySetHRTFDisabled(disabled);
+        }
     }
 
     public sealed class UnityAudioEngineStateHelpers : AudioEngineStateHelpers
     {
         public override Transform GetListenerTransform()
         {
+#if UNITY_2023_3_OR_NEWER
+            var audioListener = GameObject.FindFirstObjectByType<AudioListener>();
+#else
             var audioListener = GameObject.FindObjectOfType<AudioListener>();
+#endif
             return (audioListener != null) ? audioListener.transform : null;
         }
 

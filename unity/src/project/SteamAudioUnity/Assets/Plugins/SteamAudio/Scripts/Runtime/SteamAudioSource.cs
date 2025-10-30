@@ -150,6 +150,7 @@ namespace SteamAudio
         public bool applyHRTFToPathing = false;
         [Range(0.0f, 10.0f)]
         public float pathingMixLevel = 1.0f;
+        public bool normalizePathingEQ = false;
 
 #if STEAMAUDIO_ENABLED
         Simulator mSimulator = null;
@@ -184,11 +185,12 @@ namespace SteamAudio
 
             mThis = GCHandle.Alloc(this);
 
-            if (mSettings.audioEngine == AudioEngineType.Unity &&
+            if ((mSettings.audioEngine == AudioEngineType.Unity &&
                 distanceAttenuation &&
                 distanceAttenuationInput == DistanceAttenuationInput.CurveDriven &&
                 reflections &&
-                useDistanceCurveForReflections)
+                useDistanceCurveForReflections) ||
+                (pathing && distanceAttenuationInput == DistanceAttenuationInput.CurveDriven))
             {
                 mAttenuationData.rolloffMode = mAudioSource.rolloffMode;
                 mAttenuationData.minDistance = mAudioSource.minDistance;
@@ -294,6 +296,10 @@ namespace SteamAudio
             {
                 inputs.distanceAttenuationModel = mCurveAttenuationModel;
             }
+            else if (pathing && distanceAttenuationInput == DistanceAttenuationInput.CurveDriven)
+            {
+                inputs.distanceAttenuationModel = mCurveAttenuationModel;
+            }
             else
             {
                 inputs.distanceAttenuationModel.type = DistanceAttenuationModelType.Default;
@@ -316,7 +322,7 @@ namespace SteamAudio
             inputs.visRadius = mSettings.bakingVisibilityRadius;
             inputs.visThreshold = mSettings.bakingVisibilityThreshold;
             inputs.visRange = mSettings.bakingVisibilityRange;
-            inputs.pathingOrder = mSettings.bakingAmbisonicOrder;
+            inputs.pathingOrder = mSettings.realTimeAmbisonicOrder;
             inputs.enableValidation = pathValidation ? Bool.True : Bool.False;
             inputs.findAlternatePaths = findAlternatePaths ? Bool.True : Bool.False;
 

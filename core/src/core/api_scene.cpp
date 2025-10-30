@@ -192,6 +192,21 @@ IPLerror CScene::createInstancedMesh(IPLInstancedMeshSettings* settings,
     return IPL_STATUS_SUCCESS;
 }
 
+void CScene::setStaticMeshMaterial(IStaticMesh* staticMesh, IPLMaterial* newMaterial, IPLint32 index)
+{
+    if (!staticMesh || !newMaterial)
+        return;
+
+    auto _scene = mHandle.get();
+    auto _staticMesh = static_cast<CStaticMesh*>(staticMesh)->mHandle.get();
+    if (!_scene || !_staticMesh)
+        return;
+
+    auto* _newMaterial = reinterpret_cast<Material*>(newMaterial);
+
+    _scene->setStaticMeshMaterial(_staticMesh.get(), _newMaterial, index);
+}
+
 
 // --------------------------------------------------------------------------------------------------------------------
 // CStaticMesh
@@ -307,7 +322,7 @@ CInstancedMesh::CInstancedMesh(CScene* scene,
     if (!_scene || !_subScene)
         throw Exception(Status::Failure);
 
-    auto& _transform = reinterpret_cast<Matrix4x4f&>(settings->transform);
+    auto _transform = reinterpret_cast<Matrix4x4f&>(settings->transform).transposedCopy();
 
     new (&mHandle) Handle<ipl::IInstancedMesh>(_scene->createInstancedMesh(_subScene, _transform), _context);
 }
@@ -364,7 +379,7 @@ void CInstancedMesh::updateTransform(IScene* scene,
     if (!_scene || !_instancedMesh)
         return;
 
-    auto& _transform = reinterpret_cast<Matrix4x4f&>(transform);
+    auto _transform = reinterpret_cast<Matrix4x4f&>(transform).transposedCopy();
 
     _instancedMesh->updateTransform(*_scene, _transform);
 }

@@ -39,6 +39,7 @@ void DelayEffect::reset()
     mWritePos = 0;
     mPrevDelayInSamples = 0.0f;
     mNumTailSamplesRemaining = 0;
+    mFirstFrame = true;
 }
 
 AudioEffectState DelayEffect::apply(const DelayEffectParams& params,
@@ -57,8 +58,8 @@ AudioEffectState DelayEffect::apply(const DelayEffectParams& params,
         return AudioEffectState::TailComplete;
     }
 
-    auto curDelayInSamples = mPrevDelayInSamples;
-    auto dDelayInSamples = (params.delayInSamples - mPrevDelayInSamples) / mFrameSize;
+    auto curDelayInSamples = mFirstFrame ? params.delayInSamples : mPrevDelayInSamples;
+    auto dDelayInSamples = mFirstFrame ? 0.0f : (params.delayInSamples - mPrevDelayInSamples) / mFrameSize;
 
     for (auto i = 0; i < mFrameSize; ++i)
     {

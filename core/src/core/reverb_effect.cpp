@@ -35,22 +35,20 @@ ReverbEffect::ReverbEffect(const AudioSettings& audioSettings)
     mApplyDispatch = (gSIMDLevel() >= SIMDLevel::AVX) ? &ReverbEffect::apply_float8 : &ReverbEffect::apply_float4;
     mTailDispatch = (gSIMDLevel() >= SIMDLevel::AVX) ? &ReverbEffect::tail_float8 : &ReverbEffect::tail_float4;
 #else
+    mApplyDispatch = &ReverbEffect::apply_float4;
     mTailDispatch = &ReverbEffect::tail_float4;
 #endif
 
-    calcDelaysForReverbTime(2.0f);
-
-    const int allpassDelays[] = {225, 341, 441, 556};
-
+    calcDelaysForReverbTime(10.0f);
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].resize(mDelayValues[i], audioSettings.frameSize);
-
-        mAllpassX[i][0].resize(allpassDelays[i % 4], 0);
-        mAllpassY[i][0].resize(allpassDelays[i % 4], 0);
-        mAllpassX[i][1].resize(allpassDelays[(i + 1) % 4], 0);
-        mAllpassY[i][1].resize(allpassDelays[(i + 1) % 4], 0);
     }
+
+    mAllpass[0].resize(225, 0.5f, 0);
+    mAllpass[1].resize(341, 0.5f, 0);
+    mAllpass[2].resize(441, 0.5f, 0);
+    mAllpass[3].resize(556, 0.5f, 0);
 
     mXOld.resize(kNumDelays, audioSettings.frameSize);
     mXNew.resize(kNumDelays, audioSettings.frameSize);
@@ -63,11 +61,11 @@ void ReverbEffect::reset()
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].reset();
+    }
 
-        mAllpassX[i][0].reset();
-        mAllpassY[i][0].reset();
-        mAllpassX[i][1].reset();
-        mAllpassY[i][1].reset();
+    for (auto i = 0; i < kNumAllpasses; ++i)
+    {
+        mAllpass[i].reset();
     }
 
     mCurrent = 0;
@@ -98,7 +96,13 @@ AudioEffectState ReverbEffect::apply(const ReverbEffectParams& params,
     }
 
     const auto* reverbTimes = params.reverb->reverbTimes;
-    auto maxReverbTime = std::max({reverbTimes[0], reverbTimes[1], reverbTimes[2]});
+
+    auto maxReverbTime = 0.0f;
+    for (auto i = 0; i < Bands::kNumBands; ++i)
+    {
+        maxReverbTime = std::max(maxReverbTime, reverbTimes[i]);
+    }
+
     mNumTailFramesRemaining = 2 * static_cast<int>(ceilf((maxReverbTime * mSamplingRate) / mFrameSize)); // fixme: why 2x?
 
     return (mNumTailFramesRemaining > 0) ? AudioEffectState::TailRemaining : AudioEffectState::TailComplete;
@@ -136,18 +140,21 @@ void ReverbEffect::apply_float4(const float* reverbTimes,
 
     memset(out, 0, mFrameSize * sizeof(float));
 
-    float const lowCutoff[Bands::kNumBands] = {20.0f, 500.0f, 5000.0f};
-    float const highCutoff[Bands::kNumBands] = {500.0f, 5000.0f, 22000.0f};
-
     for (auto i = 0; i < kNumDelays; ++i)
     {
         float absorptiveGains[Bands::kNumBands];
         calcAbsorptiveGains(clampedReverbTimes, mDelayValues[i], absorptiveGains);
 
         IIR iir[Bands::kNumBands];
-        iir[0] = IIR::lowShelf(highCutoff[0], absorptiveGains[0], mSamplingRate);
-        iir[1] = IIR::peaking(lowCutoff[1], highCutoff[1], absorptiveGains[1], mSamplingRate);
-        iir[2] = IIR::highShelf(lowCutoff[2], absorptiveGains[2], mSamplingRate);
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            if (j == 0)
+                iir[j] = IIR::lowShelf(Bands::kHighCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+            else if (j == Bands::kNumBands - 1)
+                iir[j] = IIR::highShelf(Bands::kLowCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+            else
+                iir[j] = IIR::peaking(Bands::kLowCutoffFrequencies[j], Bands::kHighCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+        }
 
         for (auto j = 0; j < Bands::kNumBands; ++j)
         {
@@ -159,9 +166,15 @@ void ReverbEffect::apply_float4(const float* reverbTimes,
     calcToneCorrectionGains(clampedReverbTimes, toneCorrectionGains);
 
     IIR iir[Bands::kNumBands];
-    iir[0] = IIR::lowShelf(highCutoff[0], toneCorrectionGains[0], mSamplingRate);
-    iir[1] = IIR::peaking(lowCutoff[1], highCutoff[1], toneCorrectionGains[1], mSamplingRate);
-    iir[2] = IIR::highShelf(lowCutoff[2], toneCorrectionGains[2], mSamplingRate);
+    for (auto j = 0; j < Bands::kNumBands; ++j)
+    {
+        if (j == 0)
+            iir[j] = IIR::lowShelf(Bands::kHighCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+        else if (j == Bands::kNumBands - 1)
+            iir[j] = IIR::highShelf(Bands::kLowCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+        else
+            iir[j] = IIR::peaking(Bands::kLowCutoffFrequencies[j], Bands::kHighCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+    }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)
     {
@@ -171,6 +184,11 @@ void ReverbEffect::apply_float4(const float* reverbTimes,
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].get(mFrameSize, mXOld[i]);
+
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXOld[i], mXOld[i]);
+        }
     }
 
     float4_t xOld[kNumDelays];
@@ -192,11 +210,6 @@ void ReverbEffect::apply_float4(const float* reverbTimes,
 
     for (auto i = 0; i < kNumDelays; ++i)
     {
-        for (auto j = 0; j < Bands::kNumBands; ++j)
-        {
-            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXNew[i], mXNew[i]);
-        }
-
         ArrayMath::add(mFrameSize, mXNew[i], in, mXNew[i]);
 
         mDelayLines[i].put(mFrameSize, mXNew[i]);
@@ -209,24 +222,16 @@ void ReverbEffect::apply_float4(const float* reverbTimes,
 
     ArrayMath::scale(mFrameSize, mXOld[0], 1.0f / kNumDelays, mXOld[0]);
 
-    float4_t xm, ym;
-    auto g = float4::set1(0.25f);
     for (auto i = 0; i < mFrameSize; i += 4)
     {
-        auto v = float4::loadu(&mXOld[0][i]);
+        xOld[0] = float4::loadu(&mXOld[0][i]);
 
-        for (auto k = 0; k < 2; ++k)
+        for (auto j = 0; j < kNumAllpasses; ++j)
         {
-            auto x = v;
-            mAllpassX[0][k].get(xm);
-            mAllpassY[1][k].get(ym);
-            auto y = float4::sub(float4::add(xm, float4::mul(g, ym)), float4::mul(g, x));
-            mAllpassX[0][k].put(x);
-            mAllpassY[1][k].put(y);
-            v = y;
+            xOld[0] = mAllpass[j].apply(xOld[0]);
         }
 
-        float4::storeu(&out[i], v);
+        float4::storeu(&out[i], xOld[0]);
     }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)
@@ -240,6 +245,11 @@ void ReverbEffect::tail_float4(float* out)
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].get(mFrameSize, mXOld[i]);
+
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXOld[i], mXOld[i]);
+        }
     }
 
     float4_t xOld[kNumDelays];
@@ -261,11 +271,6 @@ void ReverbEffect::tail_float4(float* out)
 
     for (auto i = 0; i < kNumDelays; ++i)
     {
-        for (auto j = 0; j < Bands::kNumBands; ++j)
-        {
-            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXNew[i], mXNew[i]);
-        }
-
         mDelayLines[i].put(mFrameSize, mXNew[i]);
     }
 
@@ -276,24 +281,16 @@ void ReverbEffect::tail_float4(float* out)
 
     ArrayMath::scale(mFrameSize, mXOld[0], 1.0f / kNumDelays, mXOld[0]);
 
-    float4_t xm, ym;
-    auto g = float4::set1(0.25f);
     for (auto i = 0; i < mFrameSize; i += 4)
     {
-        auto v = float4::loadu(&mXOld[0][i]);
+        xOld[0] = float4::loadu(&mXOld[0][i]);
 
-        for (auto k = 0; k < 2; ++k)
+        for (auto j = 0; j < kNumAllpasses; ++j)
         {
-            auto x = v;
-            mAllpassX[0][k].get(xm);
-            mAllpassY[1][k].get(ym);
-            auto y = float4::sub(float4::add(xm, float4::mul(g, ym)), float4::mul(g, x));
-            mAllpassX[0][k].put(x);
-            mAllpassY[1][k].put(y);
-            v = y;
+            xOld[0] = mAllpass[j].apply(xOld[0]);
         }
 
-        float4::storeu(&out[i], v);
+        float4::storeu(&out[i], xOld[0]);
     }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)
@@ -316,13 +313,16 @@ void ReverbEffect::calcDelaysForReverbTime(float reverbTime)
     }
 }
 
+float ReverbEffect::sMinAbsorptiveGain = 1e-3f;
+
 void ReverbEffect::calcAbsorptiveGains(const float* reverbTimes,
                                        int delay,
                                        float* gains)
 {
     for (auto i = 0; i < Bands::kNumBands; ++i)
     {
-        gains[i] = expf(-(6.91f * delay) / (reverbTimes[i] * mSamplingRate));
+        // Note: Limit the gains to avoid instability in IIR filter.
+        gains[i] = std::max(expf(-(6.91f * delay) / (reverbTimes[i] * mSamplingRate)), sMinAbsorptiveGain);
     }
 }
 
@@ -334,7 +334,12 @@ void ReverbEffect::calcToneCorrectionGains(const float* reverbTimes,
         gains[i] = sqrtf(1.0f / reverbTimes[i]);
     }
 
-    auto maxGain = std::max({gains[0], gains[1], gains[2]});
+    auto maxGain = 0.0f;
+    for (auto i = 0; i < Bands::kNumBands; ++i)
+    {
+        maxGain = std::max(maxGain, gains[i]);
+    }
+    
     for (auto i = 0; i < Bands::kNumBands; ++i)
     {
         gains[i] /= maxGain;

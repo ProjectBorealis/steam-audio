@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.17)
 
-project(Phonon VERSION 4.5.3)
+project(Phonon VERSION 4.7.0)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_HOME_DIRECTORY}/build")
@@ -35,6 +35,8 @@ elseif (ANDROID)
     set(IPL_OS_ANDROID TRUE)
 elseif (APPLE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(IPL_OS_IOS TRUE)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(IPL_OS_WASM TRUE)
 else()
     set(IPL_OS_UNSUPPORTED TRUE)
 endif()
@@ -59,6 +61,8 @@ elseif (IPL_OS_ANDROID)
     endif()
 elseif (IPL_OS_IOS)
     set(IPL_CPU_ARMV8 TRUE)
+elseif (IPL_OS_WASM)
+    set(IPL_CPU_ARMV7 TRUE)
 endif()
 
 
@@ -97,6 +101,9 @@ if (IPL_OS_ANDROID)
 endif()
 if (IPL_OS_IOS)
     add_definitions(-DIPL_OS_IOS)
+endif()
+if (IPL_OS_WASM)
+    add_definitions(-DIPL_OS_WASM)
 endif()
 if (IPL_OS_UNSUPPORTED)
     add_definitions(-DIPL_OS_UNSUPPORTED)
@@ -164,10 +171,19 @@ endif()
 if (IPL_OS_ANDROID)
     add_compile_options(-fPIC -g $<$<CONFIG:Release>:-O3>)
     add_link_options(-static-libstdc++)
+
+    # Enable 16 KB page size support. (https://developer.android.com/about/versions/15/behavior-changes-all#16-kb)
+    add_link_options("-Wl,-z,max-page-size=16384")
 endif()
 
 # iOS flags
 # todo
+
+# WASM flags
+if (IPL_OS_WASM)
+    add_compile_options(-msimd128 -mfpu=neon)
+    add_link_options(-sALLOW_MEMORY_GROWTH=1 -sSINGLE_FILE=1)
+endif()
 
 
 #
@@ -178,8 +194,17 @@ find_package(Unity REQUIRED)
 
 find_package(SteamAudio REQUIRED)
 
+include(SteamAudioHelpers)
 if (STEAMAUDIOUNITY_BUILD_DOCS)
-    find_package(Sphinx REQUIRED)
+    get_host_bin_subdir(IPL_BIN_SUBDIR)
+    set(Doxygen_ROOT ${CMAKE_HOME_DIRECTORY}/../core/deps/doxygen/bin/${IPL_BIN_SUBDIR})
+    set(DOXYGEN_SKIP_DOT TRUE)
+    find_package(Doxygen)
+    find_package(Sphinx)
+    if (NOT DOXYGEN_FOUND OR NOT Sphinx_FOUND)
+        message(STATUS "Disabling docs")
+        set(STEAMAUDIOUNITY_BUILD_DOCS OFF)
+    endif()
 endif()
 
 

@@ -18,6 +18,8 @@
 
 #include "path_data.h"
 #include "probe_manager.h"
+#include "distance_attenuation.h"
+#include "deviation.h"
 
 namespace ipl {
 
@@ -61,10 +63,14 @@ public:
                    bool realTimeVis,
                    float* eqGains,
                    float* coeffs,
+                   const DistanceAttenuationModel& distanceAttenuationModel,
+                   const DeviationModel& deviationModel,
                    Vector3f* avgDirection = nullptr,
                    float* distanceRatio = nullptr,
+                   float* totalDeviation = nullptr,
                    ValidationRayVisualizationCallback validationRayVisualization = nullptr,
-                   void* userData = nullptr);
+                   void* userData = nullptr,
+                   bool forceDirectOcclusion = false);
 
     SoundPath findShortestPathFromSourceProbeToListenerProbe(const IScene& scene, const ProbeBatch& probes,
         int sourceProbeIndex, int listenerProbeIndex, const BakedPathData& bakedPathData, float radius, float threshold,
@@ -131,7 +137,7 @@ private:
                         void* userData) const;
 
     // Given a set of SoundPaths describing multiple paths that reach the listener, and corresponding weights,
-    // calculates the SH and EQ coefficients describing the total sound field.
+    // calculates the SH coefficients describing the total sound field.
     static void calcAmbisonicsCoeffsForPaths(const Vector3f& source,
                                              const Vector3f& listener,
                                              const ProbeBatch& probes,
@@ -141,8 +147,20 @@ private:
                                              const SoundPath* paths,
                                              const float* weights,
                                              int order,
-                                             float* eqGains,
+                                             const DistanceAttenuationModel& distanceAttenuationModel,
                                              float* coeffs);
+
+    // Given a set of SoundPaths describing multiple paths that reach the listener, and corresponding weights,
+    // calculates weighted EQ and total deviation of the paths.
+    static void calcEQForPaths(const ProbeBatch& probes,
+                               int* starts,
+                               int* ends,
+                               int numPaths,
+                               const SoundPath* paths,
+                               const float* weights,
+                               const DeviationModel& deviationModel,
+                               float* eqGains,
+                               float* totalDeviation);
 
     // Given a set of SoundPaths describing multiple paths that reach the listener, and corresponding weights,
     // calculates average direction of the paths.
@@ -169,6 +187,7 @@ private:
 
     // Calculates EQ coefficients corresponding to a given total deviation angle.
     static void calcDeviationTerm(float deviation,
+                                  const DeviationModel& deviationModel,
                                   float* deviationTerm);
 };
 

@@ -15,6 +15,7 @@
 //
 
 #include "path_finder.h"
+#include "profiler.h"
 
 namespace ipl {
 
@@ -24,8 +25,7 @@ namespace ipl {
 
 PathFinder::PathFinder(const ProbeBatch& probes,
                        int numThreads)
-    : mDistances(probes.numProbes(), probes.numProbes())
-    , mParents(numThreads, probes.numProbes())
+    : mParents(numThreads, probes.numProbes())
     , mCosts(numThreads, probes.numProbes())
 {
     for (auto i = 0; i < numThreads; ++i)
@@ -36,24 +36,6 @@ PathFinder::PathFinder(const ProbeBatch& probes,
         priority_queue<PriorityQueueEntry> priorityQueue(std::less<PriorityQueueEntry>(), std::move(container));
 
         mPriorityQueue.push_back(priorityQueue);
-    }
-
-    for (auto i = 0; i < probes.numProbes(); ++i)
-    {
-        mDistances[i][i] = 0.0f;
-
-        for (auto j = 0; j < i; ++j)
-        {
-            auto d = Vector3f(probes[i].influence.center - probes[j].influence.center);
-
-            auto dx = fabsf(d.x());
-            auto dy = fabsf(d.y());
-            auto dz = fabsf(d.z());
-
-            mDistances[i][j] = dx + dy + dz;
-
-            mDistances[j][i] = mDistances[i][j];
-        }
     }
 }
 
@@ -68,6 +50,8 @@ void PathFinder::findAllShortestPaths(const IScene& scene,
                                       int threadIndex,
                                       ProbePath* paths) const
 {
+    PROFILE_FUNCTION();
+
     for (auto i = 0; i < probes.numProbes(); ++i)
     {
         mParents[threadIndex][i] = -1;
@@ -89,16 +73,20 @@ void PathFinder::findAllShortestPaths(const IScene& scene,
 
         mPriorityQueue[threadIndex].pop();
 
-        for (auto v : visGraph.mAdjacent[u])
+        for (const auto& entry : visGraph.mAdjacent[u])
         {
-            auto uvDistance = (probes[u].influence.center - probes[v].influence.center).length();
+            auto v = entry.index;
+            auto newCost = mCosts[threadIndex][u] + entry.cost;
 
-            if (mCosts[threadIndex][u] + uvDistance < mCosts[threadIndex][v])
+            if (newCost > pathRange)
+                continue;
+
+            if (newCost < mCosts[threadIndex][v])
             {
-                mCosts[threadIndex][v] = mCosts[threadIndex][u] + uvDistance;
+                mCosts[threadIndex][v] = newCost;
                 mParents[threadIndex][v] = u;
 
-                mPriorityQueue[threadIndex].push(PriorityQueueEntry{v, mCosts[threadIndex][v]});
+                mPriorityQueue[threadIndex].push(PriorityQueueEntry{v, newCost});
             }
         }
     }
@@ -108,12 +96,6 @@ void PathFinder::findAllShortestPaths(const IScene& scene,
         paths[i].start = start;
         paths[i].end = i;
 
-        if ((probes[start].influence.center - probes[i].influence.center).length() > pathRange)
-        {
-            paths[i].valid = false;
-            continue;
-        }
-
         if (mParents[threadIndex][i] >= 0)
         {
             paths[i].valid = true;
@@ -121,37 +103,15 @@ void PathFinder::findAllShortestPaths(const IScene& scene,
             auto parentIndex = mParents[threadIndex][i];
             while (parentIndex >= 0 && parentIndex != start)
             {
-                paths[i].nodes.insert(paths[i].nodes.begin(), parentIndex);
+                paths[i].nodes.push_back(parentIndex);
                 parentIndex = mParents[threadIndex][parentIndex];
             }
+
+            std::reverse(paths[i].nodes.begin(), paths[i].nodes.end());
         }
         else
         {
             paths[i].valid = false;
-        }
-    }
-
-    for (auto i = 0; i < probes.numProbes(); ++i)
-    {
-        if (!paths[i].valid)
-            continue;
-
-        bool pathValid = true;
-        for (auto j = 0; j < paths[i].nodes.size() && pathValid; ++j)
-        {
-            float dist = (probes[paths[i].start].influence.center - probes[paths[i].nodes[j]].influence.center).length();
-            pathValid = pathValid && (dist <= pathRange);
-        }
-
-        for (int j = paths[i].nodes.size() - 1; j >= 0 && pathValid; --j)
-        {
-            float dist = (probes[paths[i].end].influence.center - probes[paths[i].nodes[j]].influence.center).length();
-            pathValid = pathValid && (dist <= pathRange);
-        }
-
-        if (!pathValid)
-        {
-            paths[i].reset();
         }
     }
 }
@@ -170,6 +130,8 @@ ProbePath PathFinder::findShortestPath(const IScene& scene,
                                        bool realTimeVis,
                                        int threadIndex) const
 {
+    PROFILE_FUNCTION();
+
     ProbePath result;
     result.start = start;
     result.end = end;
@@ -180,7 +142,12 @@ ProbePath PathFinder::findShortestPath(const IScene& scene,
         mCosts[threadIndex][i] = std::numeric_limits<float>::infinity();
     }
 
-    mCosts[threadIndex][start] = mDistances[start][end];
+    auto ProbeDistance = [&probes](int start, int end) -> float
+    {
+        return (probes[start].influence.center - probes[end].influence.center).length();
+    };
+
+    mCosts[threadIndex][start] = 0;
 
     while (!mPriorityQueue[threadIndex].empty())
     {
@@ -198,11 +165,14 @@ ProbePath PathFinder::findShortestPath(const IScene& scene,
 
         mPriorityQueue[threadIndex].pop();
 
-        for (auto v : visGraph.mAdjacent[u])
+        for (const auto& entry : visGraph.mAdjacent[u])
         {
-            auto uvDistance = mDistances[u][v];
+            auto v = entry.index;
 
-            if ((mCosts[threadIndex][u] + uvDistance - mDistances[u][end] + mDistances[v][end]) < mCosts[threadIndex][v])
+            auto newCost = mCosts[threadIndex][u] + entry.cost;
+
+            if (mCosts[threadIndex][v] == std::numeric_limits<float>::infinity() ||
+                newCost < mCosts[threadIndex][v])
             {
                 if (realTimeVis)
                 {
@@ -210,10 +180,10 @@ ProbePath PathFinder::findShortestPath(const IScene& scene,
                         continue;
                 }
 
-                mCosts[threadIndex][v] = mCosts[threadIndex][u] + uvDistance - mDistances[u][end] + mDistances[v][end];
+                mCosts[threadIndex][v] = newCost;
                 mParents[threadIndex][v] = u;
 
-                mPriorityQueue[threadIndex].push(PriorityQueueEntry{v, mCosts[threadIndex][v]});
+                mPriorityQueue[threadIndex].push(PriorityQueueEntry{v, newCost + ProbeDistance(v, end)});
             }
         }
     }
@@ -248,6 +218,8 @@ void PathFinder::simplifyPath(const IScene& scene,
                               bool realTimeVis,
                               int* parents) const
 {
+    PROFILE_FUNCTION();
+
     auto current = end;
     while (current != start && current >= 0)
     {

@@ -27,6 +27,7 @@
 class USteamAudioDynamicObjectComponent;
 class USteamAudioListenerComponent;
 class USteamAudioSourceComponent;
+class AStaticMeshActor;
 
 namespace SteamAudio {
 
@@ -98,11 +99,26 @@ public:
     FSteamAudioSettings GetSteamAudioSettings() const { return SteamAudioSettings; }
     bool IsInitialized() const { return bInitializationSucceded; }
 
+    /** Creates empty IPLScene based on active scene settings. */
+    bool CreateEmptyScene(IPLScene& SubScene);
+
+    /** Updates the iplStaticMesh data. */
+    void UpdateStaticMesh();
+
+    /** Updates the iplStaticMesh material data on specified StaticMeshActor. */
+    void UpdateStaticMeshMaterial(AStaticMeshActor* StaticMeshActor);
+
     /** Initializes the HRTF. */
     bool InitHRTF(IPLAudioSettings& AudioSettings);
 
     /** Initializes the global Steam Audio state. */
     bool InitializeSteamAudio(EManagerInitReason Reason);
+
+    /** Sets the Steam Audio enabled mode. */
+    void SetSteamAudioEnabled(bool bNewIsSteamAudioEnabled);
+
+    /** Returns the Steam Audio enabled mode. */
+    bool IsSteamAudioEnabled() { return bIsSteamAudioEnabled; }
 
     /** Shuts down the global Steam Audio state. */
     void ShutDownSteamAudio(bool bResetFlags = true);
@@ -138,6 +154,12 @@ public:
     void RemoveListener(USteamAudioListenerComponent* Listener);
 
 private:
+    /** a cached value indicating whether OpenCL should be initialized */
+    bool bShouldInitOpenCL = false;
+
+    /** If equal false, then Steam Audio plugins do not affect the sound */
+    bool bIsSteamAudioEnabled = true;
+
     /** The scene type we were actually able to initialize. */
     IPLSceneType ActualSceneType;
 

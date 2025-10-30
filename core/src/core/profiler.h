@@ -17,6 +17,7 @@
 #pragma once
 
 #include "memory_allocator.h"
+#include <chrono>
 
 namespace ipl {
 
@@ -35,6 +36,7 @@ public:
     double elapsedSeconds() const;
     double elapsedMilliseconds() const;
     double elapsedMicroseconds() const;
+    double elapsedNanoseconds() const;
 
 private:
     std::chrono::time_point<std::chrono::high_resolution_clock> mStartTime;
@@ -56,6 +58,8 @@ namespace Profiler
 
 #if defined(IPL_ENABLE_TELEMETRY)
 #include "telemetry_profiler.h"
+#elif defined(IPL_ENABLE_TRACY)
+#include "tracy_profiler.h"
 #else
 #include "null_profiler.h"
 #endif

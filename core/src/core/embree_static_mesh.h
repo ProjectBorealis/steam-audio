@@ -83,6 +83,27 @@ public:
         return mMaterials.data();
     }
 
+    Array<Material>& materialsToUpdate()
+    {
+        return mMaterialsToUpdate;
+    }
+
+    void markToUpdateMaterials() { mNeedToUpdateMaterials = true; }
+
+    void unmarkToUpdateMaterials() { mNeedToUpdateMaterials = false; }
+
+    bool isMarkedToUpdateMaterials() const { return mNeedToUpdateMaterials; }
+
+    ispc::Material* ispcMaterials()
+    {
+        return mISPCMaterials.data();
+    }
+
+    const ispc::Material* ispcMaterials() const
+    {
+        return mISPCMaterials.data();
+    }
+
     void enable(const EmbreeScene& scene);
 
     void disable(const EmbreeScene& scene);
@@ -92,12 +113,18 @@ private:
                     const Vector3f* vertices,
                     const Triangle* triangles);
 
+    void convertMaterials();
+
     std::weak_ptr<EmbreeScene> mScene;
+    RTCGeometry mGeometry;
     uint32_t mGeometryIndex;
     int mNumVertices;
     int mNumTriangles;
     Array<int> mMaterialIndices;
     Array<Material> mMaterials;
+    Array<Material> mMaterialsToUpdate;
+    bool mNeedToUpdateMaterials = false;
+    vector<ispc::Material> mISPCMaterials;
 };
 
 }

@@ -19,6 +19,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "StaticMeshResources.h"
+#include "SteamAudioSettings.h"
 
 // ---------------------------------------------------------------------------------------------------------------------
 // USteamAudioGeometryComponent
@@ -32,6 +33,17 @@ USteamAudioGeometryComponent::USteamAudioGeometryComponent()
 {
     // Disable ticking.
     PrimaryComponentTick.bCanEverTick = false;
+}
+
+void USteamAudioGeometryComponent::SetExportIndex(int32 NewExportIndex)
+{
+    if (!bWantToChangeMaterialAtRuntime)
+        return;
+
+    ExportIndex = NewExportIndex;
+#if WITH_EDITOR
+    Modify();
+#endif
 }
 
 void USteamAudioGeometryComponent::OnComponentCreated()

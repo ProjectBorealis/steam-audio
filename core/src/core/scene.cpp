@@ -148,6 +148,17 @@ void Scene::commit()
     {
         instancedMesh->commit(*this);
     }
+    
+    // Update materials if needed
+    for (const auto& staticMesh : mStaticMeshes[0])
+    {
+        auto phononStaticMesh = static_cast<StaticMesh*>(staticMesh.get());
+        if (phononStaticMesh->isMarkedToUpdateMaterials())
+        {
+            memcpy(phononStaticMesh->materials(), phononStaticMesh->materialsToUpdate().data(), phononStaticMesh->numMaterials() * sizeof(Material));
+            phononStaticMesh->unmarkToUpdateMaterials();
+        }
+    }
 
     // The scene will be considered unchanged until something is changed subsequently.
     mHasChanged = false;
@@ -356,7 +367,7 @@ void Scene::dumpObj(const string& fileName) const
         for (auto k = 0; k < _staticMesh.numVertices(); ++k)
         {
             const auto& vertex = _staticMesh.mesh().vertex(k);
-            auto transformedVertex = transforms[i].transposedCopy() * Vector4f(vertex.x(), vertex.y(), vertex.z(), 1.0f);
+            auto transformedVertex = transforms[i] * Vector4f(vertex.x(), vertex.y(), vertex.z(), 1.0f);
             fprintf(objFile, "v %f %f %f\n", transformedVertex.elements[0], transformedVertex.elements[1], transformedVertex.elements[2]);
         }
 
@@ -381,6 +392,20 @@ void Scene::dumpObj(const string& fileName) const
 
     fclose(mtlFile);
     fclose(objFile);
+}
+
+void Scene::setStaticMeshMaterial(IStaticMesh* staticMesh, Material* newMaterial, int index)
+{
+    auto buildInStaticMesh = reinterpret_cast<StaticMesh*>(staticMesh);
+    for (const auto& curStaticMesh : mStaticMeshes[0])
+    {
+        if (curStaticMesh.get() == buildInStaticMesh)
+        {
+            *const_cast<Material*>(buildInStaticMesh->materialsToUpdate().data() + index) = *newMaterial;
+            buildInStaticMesh->markToUpdateMaterials();
+            break;
+        }
+    }
 }
 
 }

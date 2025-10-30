@@ -15,7 +15,10 @@
 //
 
 #include "SteamAudioReverb.h"
+#include "AudioDevice.h"
+#include "AudioDeviceManager.h"
 #include "Components/AudioComponent.h"
+#include "GameFramework/Actor.h"
 #include "HAL/UnrealMemory.h"
 #include "Sound/SoundSubmix.h"
 #include "SteamAudioCommon.h"
@@ -23,6 +26,7 @@
 #include "SteamAudioReverbSettings.h"
 #include "SteamAudioSettings.h"
 #include "SteamAudioSourceComponent.h"
+#include "SteamAudioUnrealAudioEngineInterface.h"
 
 #include "Misc/AssertionMacros.h"
 
@@ -241,8 +245,13 @@ void FSteamAudioReverbPlugin::OnInitSource(const uint32 SourceId, const FName& A
         }
     }
 
-    if (!Source.InBuffer.data)
+    if (!Source.InBuffer.data || Source.InBuffer.numChannels != NumChannels)
     {
+        if (Source.InBuffer.data)
+        {
+            iplAudioBufferFree(Context, &Source.InBuffer);
+        }
+
         IPLerror Status = iplAudioBufferAllocate(Context, NumChannels, AudioSettings.frameSize, &Source.InBuffer);
         if (Status != IPL_STATUS_SUCCESS)
         {
@@ -273,8 +282,13 @@ void FSteamAudioReverbPlugin::OnInitSource(const uint32 SourceId, const FName& A
         }
     }
 
-    if (!Source.OutBuffer.data)
+    if (!Source.OutBuffer.data || Source.OutBuffer.numChannels != NumChannels)
     {
+        if (Source.OutBuffer.data)
+        {
+            iplAudioBufferFree(Context, &Source.OutBuffer);
+        }
+
         IPLerror Status = iplAudioBufferAllocate(Context, NumChannels, AudioSettings.frameSize, &Source.OutBuffer);
         if (Status != IPL_STATUS_SUCCESS)
         {
@@ -375,6 +389,15 @@ USoundSubmix* FSteamAudioReverbPlugin::GetSubmix()
 
 void FSteamAudioReverbPlugin::ProcessSourceAudio(const FAudioPluginSourceInputData& InputData, FAudioPluginSourceOutputData& OutputData)
 {
+    if (!FSteamAudioModule::GetManager().IsSteamAudioEnabled())
+    {
+        for (int32 i = 0; i < OutputData.AudioBuffer.Num(); ++i)
+        {
+            OutputData.AudioBuffer[i] = (*InputData.AudioBuffer)[i];
+        }
+        return;
+    }
+
 	FSteamAudioReverbSource& Source = Sources[InputData.SourceId];
     Source.ClearBuffers();
 
@@ -431,7 +454,7 @@ void FSteamAudioReverbPlugin::ProcessSourceAudio(const FAudioPluginSourceInputDa
                 AmbisonicsDecodeParams.order = SimulationSettings.maxOrder;
                 AmbisonicsDecodeParams.hrtf = Source.HRTF;
                 AmbisonicsDecodeParams.orientation = FSteamAudioModule::GetManager().GetListenerCoordinates();
-                AmbisonicsDecodeParams.binaural = bBinaural ? IPL_TRUE : IPL_FALSE;
+                AmbisonicsDecodeParams.binaural = (bBinaural && !FUnrealAudioEngineState::IsHRTFDisabled()) ? IPL_TRUE : IPL_FALSE;
 
                 iplAmbisonicsDecodeEffectApply(Source.AmbisonicsDecodeEffect, &AmbisonicsDecodeParams, &Source.IndirectBuffer, &Source.OutBuffer);
 
@@ -519,6 +542,11 @@ void FSteamAudioReverbSubmixPlugin::LazyInit()
     if (!Context)
     {
         Context = iplContextRetain(SteamAudio::FSteamAudioModule::GetManager().GetContext());
+    }
+
+    if (!ReverbPlugin)
+    {
+        ReverbPlugin = StaticCast<SteamAudio::FSteamAudioReverbPlugin*>(GEngine->GetAudioDeviceManager()->GetMainAudioDeviceRaw()->ReverbPluginInterface.Get());
     }
 
     IPLAudioSettings AudioSettings = ReverbPlugin->GetAudioSettings();
@@ -806,7 +834,7 @@ void FSteamAudioReverbSubmixPlugin::OnProcessAudio(const FSoundEffectSubmixInput
             AmbisonicsDecodeParams.order = SimulationSettings.maxOrder;
             AmbisonicsDecodeParams.hrtf = HRTF;
             AmbisonicsDecodeParams.orientation = SteamAudio::FSteamAudioModule::GetManager().GetListenerCoordinates();
-            AmbisonicsDecodeParams.binaural = (CurrentPreset && CurrentPreset->Settings.bApplyHRTF) ? IPL_TRUE : IPL_FALSE;
+            AmbisonicsDecodeParams.binaural = (CurrentPreset && CurrentPreset->Settings.bApplyHRTF && !SteamAudio::FUnrealAudioEngineState::IsHRTFDisabled()) ? IPL_TRUE : IPL_FALSE;
 
             iplAmbisonicsDecodeEffectApply(AmbisonicsDecodeEffect, &AmbisonicsDecodeParams, &IndirectBuffer, &OutBuffer);
 

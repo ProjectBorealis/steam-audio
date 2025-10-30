@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+#pragma once
+
 #include "indirect_effect.h"
 using namespace ipl;
 
@@ -51,9 +53,10 @@ public:
                                       IPLAudioBuffer* out,
                                       IReflectionMixer* mixer) override;
 
-    IPLint32 getTailSize();
+    virtual IPLint32 getTailSize() override;
 
-    IPLAudioEffectState getTail(IPLAudioBuffer* out, IReflectionMixer* mixer);
+    virtual IPLAudioEffectState getTail(IPLAudioBuffer* out, 
+                                        IReflectionMixer* mixer) override;
 };
 
 

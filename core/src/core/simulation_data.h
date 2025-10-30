@@ -72,6 +72,9 @@ struct ReflectionSimulationState
     Array<float> distanceAttenuationCorrectionCurve;
     bool applyDistanceAttenuationCorrectionCurve;
     unique_ptr<ImpulseResponse> impulseResponse;
+    unique_ptr<ImpulseResponse> impulseResponseCopy;
+    std::atomic<bool> impulseResponseUpdated;
+    bool validSimulationData;
 };
 
 struct ReflectionSimulationOutputs
@@ -99,6 +102,8 @@ struct PathingSimulationInputs
     bool findAlternatePaths;
     bool simplifyPaths;
     bool realTimeVis;
+    DistanceAttenuationModel distanceAttenuationModel;
+    DeviationModel deviationModel;
 };
 
 struct PathingSimulationState
@@ -107,6 +112,7 @@ struct PathingSimulationState
     Array<float> sh;
     Vector3f direction;
     float distanceRatio;
+    float totalDeviation;
 };
 
 struct PathingSimulationOutputs
@@ -115,6 +121,7 @@ struct PathingSimulationOutputs
     Array<float> sh;
     Vector3f direction;
     float distanceRatio;
+    float totalDeviation;
 };
 
 class SimulationData

@@ -365,6 +365,8 @@ add_library(core OBJECT
     indirect_effect.h
     indirect_effect.cpp
 
+    deviation.h
+    deviation.cpp
     path_visibility.h
     path_visibility.cpp
     path_visibility.fbs
@@ -448,9 +450,15 @@ add_library(core OBJECT
     api_simulator.cpp
     api_advanced_simulation.cpp
     api_validation_layer.cpp
+    api_energy_field.h
+    api_energy_field.cpp
+    api_impulse_response.h
+    api_impulse_response.cpp
+    api_reconstructor.h
+    api_reconstructor.cpp
 )
 
-if (NOT PROFILING_TOOL)
+if (STEAMAUDIO_PROFILING_TOOL STREQUAL "None")
     target_sources(core PRIVATE
         null_profiler.h
         null_profiler.cpp
@@ -717,6 +725,8 @@ elseif (IPL_OS_ANDROID)
     endif()
 elseif (IPL_OS_IOS)
     set(FMOD_LIB_DIR ${CMAKE_HOME_DIRECTORY}/../fmod/lib/ios)
+elseif (IPL_OS_WASM)
+    set(FMOD_LIB_DIR ${CMAKE_HOME_DIRECTORY}/../fmod/lib/wasm)
 endif()
 
 if (NOT FMOD_LIB_DIR STREQUAL "")
@@ -759,6 +769,24 @@ endif()
 
 
 #
+# POST-BUILD STEP FOR COPYING core -> wwise
+#
+
+set(WWISE_INCLUDE_DIR ${CMAKE_HOME_DIRECTORY}/../wwise/include/phonon)
+
+if (NOT WWISE_INCLUDE_DIR STREQUAL "")
+    add_custom_command(
+        TARGET      phonon
+        POST_BUILD
+        COMMAND     ${CMAKE_COMMAND} -E make_directory ${WWISE_INCLUDE_DIR}
+        COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/phonon.h ${WWISE_INCLUDE_DIR}
+        COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/phonon_version.h ${WWISE_INCLUDE_DIR}
+        COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/phonon_interfaces.h ${WWISE_INCLUDE_DIR}
+    )
+endif()
+
+
+#
 # POST-BUILD STEP FOR COPYING core -> unity
 #
 
@@ -789,6 +817,8 @@ elseif (IPL_OS_ANDROID)
     endif()
 elseif (IPL_OS_IOS)
     set(UNITY_LIB_DIR ${CMAKE_HOME_DIRECTORY}/../unity/lib/ios)
+elseif (IPL_OS_WASM)
+    set(UNITY_LIB_DIR ${CMAKE_HOME_DIRECTORY}/../unity/lib/wasm)
 endif()
 
 set(UNITY_PLUGIN_DIR "")
@@ -816,6 +846,8 @@ elseif (IPL_OS_ANDROID)
     endif()
 elseif (IPL_OS_IOS)
     set(UNITY_PLUGIN_DIR ${CMAKE_HOME_DIRECTORY}/../unity/src/project/SteamAudioUnity/Assets/Plugins/SteamAudio/Binaries/iOS)
+elseif (IPL_OS_WASM)
+    set(UNITY_PLUGIN_DIR ${CMAKE_HOME_DIRECTORY}/../unity/src/project/SteamAudioUnity/Assets/Plugins/SteamAudio/Binaries/HTML5)
 endif()
 
 if (NOT UNITY_PLUGIN_DIR STREQUAL "")

@@ -48,23 +48,23 @@ SimulationData::SimulationData(bool enableIndirect,
     pathingInputs.enabled = false;
 
     directOutputs.directPath.distanceAttenuation = 1.0f;
-    directOutputs.directPath.airAbsorption[0] = 1.0f;
-    directOutputs.directPath.airAbsorption[1] = 1.0f;
-    directOutputs.directPath.airAbsorption[2] = 1.0f;
     directOutputs.directPath.directivity = 1.0f;
     directOutputs.directPath.occlusion = 1.0f;
-    directOutputs.directPath.transmission[0] = 1.0f;
-    directOutputs.directPath.transmission[1] = 1.0f;
-    directOutputs.directPath.transmission[2] = 1.0f;
+    for (auto i = 0; i < Bands::kNumBands; ++i)
+    {
+        directOutputs.directPath.airAbsorption[i] = 1.0f;
+        directOutputs.directPath.transmission[i] = 1.0f;
+    }
 
     if (enableIndirect)
     {
-        reflectionInputs.reverbScale[0] = 1.0f;
-        reflectionInputs.reverbScale[1] = 1.0f;
-        reflectionInputs.reverbScale[2] = 1.0f;
         reflectionInputs.transitionTime = 1.0f;
         reflectionInputs.overlapFraction = 0.25f;
         reflectionInputs.baked = false;
+        for (auto i = 0; i < Bands::kNumBands; ++i)
+        {
+            reflectionInputs.reverbScale[i] = 1.0f;
+        }
 
         reflectionState.energyField = EnergyFieldFactory::create(sceneType, maxDuration, maxOrder, openCL);
         reflectionState.accumEnergyField = EnergyFieldFactory::create(sceneType, maxDuration, maxOrder, openCL);
@@ -76,6 +76,9 @@ SimulationData::SimulationData(bool enableIndirect,
         {
             reflectionState.impulseResponse = ImpulseResponseFactory::create(indirectType, maxDuration, maxOrder, samplingRate, openCL);
             reflectionState.impulseResponse->reset();
+
+            reflectionState.impulseResponseCopy = ImpulseResponseFactory::create(indirectType, maxDuration, maxOrder, samplingRate, openCL);
+            reflectionState.impulseResponseCopy->reset();
 
             auto numChannels = SphericalHarmonics::numCoeffsForOrder(maxOrder);
             auto irSize = static_cast<int>(ceilf(maxDuration * samplingRate));
@@ -93,12 +96,18 @@ SimulationData::SimulationData(bool enableIndirect,
             reflectionOutputs.numSamples = irSize;
         }
 
+        for (auto i = 0; i < Bands::kNumBands; ++i)
+        {
+            reflectionOutputs.reverb.reverbTimes[i] = 0.0f;
+        }
+
         if (indirectType == IndirectEffectType::Hybrid)
         {
-            reflectionOutputs.hybridEQ[0] = 1.0f;
-            reflectionOutputs.hybridEQ[1] = 1.0f;
-            reflectionOutputs.hybridEQ[2] = 1.0f;
             reflectionOutputs.hybridDelay = static_cast<int>(ceilf((1.0f - reflectionInputs.overlapFraction) * reflectionInputs.transitionTime * samplingRate));
+            for (auto i = 0; i < Bands::kNumBands; ++i)
+            {
+                reflectionOutputs.hybridEQ[i] = 1.0f;
+            }
         }
 
 #if defined(IPL_USES_TRUEAUDIONEXT)
