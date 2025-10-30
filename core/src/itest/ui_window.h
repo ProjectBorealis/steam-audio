@@ -17,6 +17,7 @@
 #pragma once
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl2.h>
 
@@ -86,6 +87,7 @@ public:
                           float size = 20.0f);
 
     static void drawLineSegment(const Vector3f& p, const Vector3f& q, const UIColor& color, float width = 1.0f);
+    static void drawTriangle(const Vector3f& v0, const Vector3f& v1, const Vector3f& v2, const UIColor& c0, const UIColor& c1, const UIColor& c2, float width = 1.0f);
     static void drawRay(const Ray& ray, const UIColor& color, float width = 1.0f);
     static void drawBox(const Box& box, const UIColor& color);
     static void drawMesh(const Mesh& mesh);

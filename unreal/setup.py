@@ -24,7 +24,7 @@ import argparse
 import subprocess
 
 
-version = "4.5.3"
+version = "4.7.0"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--configuration', help="Build configuration.",

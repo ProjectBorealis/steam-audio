@@ -108,7 +108,7 @@ public:
     {}
 
     // TODO: Implement this method.
-    virtual uint32_t version() const
+    virtual uint32_t version() const override
     {
         return 0;
     }
@@ -135,6 +135,9 @@ public:
 
     virtual void dumpObj(const string& fileName) const override
     {}
+
+    virtual void setStaticMeshMaterial(IStaticMesh* staticMesh, Material* newMaterial, int index) override
+    { }
 
 private:
     ClosestHitCallback mClosestHitCallback;

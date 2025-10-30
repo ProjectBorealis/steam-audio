@@ -18,6 +18,7 @@
 #include "AudioDevice.h"
 #include "Async/Async.h"
 #include "HAL/UnrealMemory.h"
+#include "Engine/StaticMeshActor.h"
 #include "SteamAudioAudioEngineInterface.h"
 #include "SteamAudioCommon.h"
 #include "SteamAudioDynamicObjectComponent.h"
@@ -25,6 +26,7 @@
 #include "SteamAudioScene.h"
 #include "SteamAudioSettings.h"
 #include "SteamAudioSourceComponent.h"
+#include "SteamAudioStaticMeshActor.h"
 #include "SOFAFile.h"
 
 using namespace SteamAudio;
@@ -100,6 +102,50 @@ FSteamAudioManager::~FSteamAudioManager()
 {
     ShutDownSteamAudio();
 	iplContextRelease(&Context);
+}
+
+bool FSteamAudioManager::CreateEmptyScene(IPLScene& SubScene)
+{
+    IPLSceneSettings SceneSettings{};
+    SceneSettings.type = static_cast<IPLSceneType>(ActualSceneType);
+    SceneSettings.embreeDevice = EmbreeDevice;
+    SceneSettings.radeonRaysDevice = RadeonRaysDevice;
+
+    IPLerror Status = iplSceneCreate(Context, &SceneSettings, &SubScene);
+    if (Status != IPL_STATUS_SUCCESS)
+    {
+        UE_LOG(LogSteamAudio, Error, TEXT("Unable to create scene. [%d]"), Status);
+        return false;
+    }
+
+    return true;
+}
+
+void FSteamAudioManager::UpdateStaticMesh()
+{
+    UWorld* World = GEngine->GetCurrentPlayWorld();
+    ULevel* Level = World->GetCurrentLevel();
+    auto StaticMeshActor = ASteamAudioStaticMeshActor::FindInLevel(World, Level);
+    if (StaticMeshActor)
+    {
+        StaticMeshActor->UpdateStaticMesh();
+    }
+}
+
+void FSteamAudioManager::UpdateStaticMeshMaterial(AStaticMeshActor* StaticMeshActor)
+{
+    UWorld* World = GEngine->GetCurrentPlayWorld();
+    ULevel* Level = World->GetCurrentLevel();
+    auto SteamAudioStaticMeshActor = ASteamAudioStaticMeshActor::FindInLevel(World, Level);
+    if (SteamAudioStaticMeshActor)
+    {
+        SteamAudioStaticMeshActor->UpdateStaticMeshMaterial(StaticMeshActor);
+    }
+}
+
+void FSteamAudioManager::SetSteamAudioEnabled(bool bNewIsSteamAudioEnabled)
+{
+    bIsSteamAudioEnabled = bNewIsSteamAudioEnabled;
 }
 
 IPLCoordinateSpace3 FSteamAudioManager::GetListenerCoordinates() const
@@ -222,7 +268,7 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
     bool bShouldInitEmbree = (Reason == EManagerInitReason::BAKING || Reason == EManagerInitReason::PLAYING) && (ConfiguredSceneType == IPL_SCENETYPE_EMBREE);
     bool bShouldInitRadeonRays = (Reason == EManagerInitReason::BAKING || Reason == EManagerInitReason::PLAYING) && (ConfiguredSceneType == IPL_SCENETYPE_RADEONRAYS);
     bool bShouldInitTrueAudioNext = (Reason == EManagerInitReason::PLAYING) && (ConfiguredReflectionEffectType == IPL_REFLECTIONEFFECTTYPE_TAN);
-    bool bShouldInitOpenCL = (bShouldInitRadeonRays || bShouldInitTrueAudioNext);
+    bShouldInitOpenCL = (bShouldInitRadeonRays || bShouldInitTrueAudioNext);
 
     if (bShouldInitEmbree)
     {
@@ -305,17 +351,10 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
 
     check(!Scene);
 
-    IPLSceneSettings SceneSettings{};
-    SceneSettings.type = static_cast<IPLSceneType>(ActualSceneType);
-    SceneSettings.embreeDevice = EmbreeDevice;
-    SceneSettings.radeonRaysDevice = RadeonRaysDevice;
-
-    IPLerror Status = iplSceneCreate(Context, &SceneSettings, &Scene);
-    if (Status != IPL_STATUS_SUCCESS)
+    if (!CreateEmptyScene(Scene))
     {
         ShutDownSteamAudio(false);
         bInitializationSucceded = false;
-        UE_LOG(LogSteamAudio, Error, TEXT("Unable to create scene. [%d]"), Status);
         return false;
     }
 
@@ -329,6 +368,13 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
             // We're using FMOD Studio, so try to load the corresponding support plugin. If this is not enabled in
             // project settings, this step will fail.
             AudioEngineStateFactory = FModuleManager::LoadModulePtr<IAudioEngineStateFactory>(TEXT("SteamAudioFMODStudio"));
+        }
+
+        if (SteamAudioSettings.AudioEngine == EAudioEngineType::WWISE)
+        {
+            // We're using Wwise, so try to load the corresponding support plugin. If this is not enabled in
+            // project settings, this step will fail.
+            AudioEngineStateFactory = FModuleManager::LoadModulePtr<IAudioEngineStateFactory>(TEXT("SteamAudioWwise"));
         }
 
         if (!AudioEngineStateFactory)
@@ -352,7 +398,7 @@ bool FSteamAudioManager::InitializeSteamAudio(EManagerInitReason Reason)
         SimulationSettings.radeonRaysDevice = RadeonRaysDevice;
         SimulationSettings.tanDevice = TrueAudioNextDevice;
 
-        Status = iplSimulatorCreate(Context, &SimulationSettings, &Simulator);
+        IPLerror Status = iplSimulatorCreate(Context, &SimulationSettings, &Simulator);
         if (Status != IPL_STATUS_SUCCESS)
         {
             ShutDownSteamAudio(false);
@@ -547,7 +593,6 @@ IPLInstancedMesh FSteamAudioManager::LoadDynamicObject(USteamAudioDynamicObjectC
     FString AssetName = DynamicObjectComponent->GetAssetToLoad().GetAssetPathString();
 
     IPLScene SubScene = nullptr;
-    IPLerror Status = IPL_STATUS_SUCCESS;
     if (DynamicObjects.Contains(AssetName))
     {
         SubScene = DynamicObjects[AssetName];
@@ -555,15 +600,8 @@ IPLInstancedMesh FSteamAudioManager::LoadDynamicObject(USteamAudioDynamicObjectC
     }
     else
     {
-        IPLSceneSettings SceneSettings{};
-        SceneSettings.type = static_cast<IPLSceneType>(ActualSceneType);
-        SceneSettings.embreeDevice = EmbreeDevice;
-        SceneSettings.radeonRaysDevice = RadeonRaysDevice;
-
-        Status = iplSceneCreate(Context, &SceneSettings, &SubScene);
-        if (Status != IPL_STATUS_SUCCESS)
+        if (!CreateEmptyScene(SubScene))
         {
-            UE_LOG(LogSteamAudio, Error, TEXT("Unable to create scene. [%d]"), Status);
             return nullptr;
         }
 
@@ -588,7 +626,7 @@ IPLInstancedMesh FSteamAudioManager::LoadDynamicObject(USteamAudioDynamicObjectC
     InstancedMeshSettings.transform = ConvertTransform(DynamicObjectComponent->GetOwner()->GetRootComponent()->GetComponentTransform());
 
     IPLInstancedMesh InstancedMesh = nullptr;
-    Status = iplInstancedMeshCreate(Scene, &InstancedMeshSettings, &InstancedMesh);
+    IPLerror Status = iplInstancedMeshCreate(Scene, &InstancedMeshSettings, &InstancedMesh);
     if (Status != IPL_STATUS_SUCCESS)
     {
         UE_LOG(LogSteamAudio, Error, TEXT("Unable to create instanced mesh. [%d]"), Status);
@@ -740,7 +778,10 @@ void FSteamAudioManager::Tick(float DeltaTime)
             Listener->SetInputs(static_cast<IPLSimulationFlags>(IPL_SIMULATIONFLAGS_REFLECTIONS | IPL_SIMULATIONFLAGS_PATHING));
         }
 
-        AsyncPool(*ThreadPool, [this]
+        ThreadPoolIdle = false;
+
+        if (!bShouldInitOpenCL || (bShouldInitOpenCL && OpenCLDevice))
+        AsyncPool(*ThreadPool, [this] // May cause a crash when OpenCL device is not initialized
         {
             iplSimulatorRunReflections(Simulator);
             iplSimulatorRunPathing(Simulator);

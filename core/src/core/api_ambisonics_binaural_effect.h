@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+#pragma once
+
 #include "ambisonics_binaural_effect.h"
 using namespace ipl;
 
@@ -50,9 +52,9 @@ public:
                                       IPLAudioBuffer* in,
                                       IPLAudioBuffer* out) override;
 
-    IPLint32 getTailSize();
+    virtual IPLint32 getTailSize() override;
 
-    IPLAudioEffectState getTail(IPLAudioBuffer* out);
+    virtual IPLAudioEffectState getTail(IPLAudioBuffer* out) override;
 };
 
 }

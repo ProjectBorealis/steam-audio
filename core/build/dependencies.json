@@ -128,6 +128,14 @@
                         "-DTARGET_C_EXTRA=neon",
                         "-DTARGET_CXX_EXTRA=neon"
                     ]
+                },
+                {
+                    "platforms": ["wasm"],
+                    "flags": [
+                        "-DEMSCRIPTEN_SYSTEM_PROCESSOR=armv7l",
+                        "-DCMAKE_C_FLAGS=-msimd128 -mfpu=neon -DPFFFT_ENABLE_NEON=1 -D__arm__=1",
+                        "-DCMAKE_CXX_FLAGS=-msimd128 -mfpu=neon -DPFFFT_ENABLE_NEON=1 -D__arm__=1"
+                    ]
                 }
             ]
         },
@@ -150,13 +158,27 @@
         },
         "fetch": {
             "git": "https://github.com/linkotec/ffts.git",
-            "tag": "2c8da4877588e288ff4cd550f14bec2dc7bf668c"
+            "tag": "2c8da4877588e288ff4cd550f14bec2dc7bf668c",
+            "patch": "ffts.patch"
         },
         "configure": {
             "cmake": [
                 {
+                    "platforms": ["android-arm64", "android-x86", "android-x64"],
                     "flags": [
                         "-DDISABLE_DYNAMIC_CODE=ON"
+                    ]
+                },
+                {
+                    "platforms": ["android-armv7"],
+                    "flags": [
+                        "-DENABLE_NEON=ON"
+                    ]
+                },
+                {
+                    "platforms": ["android-arm64"],
+                    "flags": [
+                        "-DENABLE_NEON=OFF"
                     ]
                 }
             ]
@@ -194,11 +216,20 @@
         },
         "fetch": {
             "git": "https://github.com/madler/zlib.git",
-            "tag": "04f42ceca40f73e2978b50e93806c2a18c1281fc",
+            "tag": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
             "patch": "zlib.patch"
         },
         "configure": {
-            "cmake": []
+            "cmake": [
+                {
+                    "platforms": ["wasm"],
+                    "flags": [
+                        "-DEMSCRIPTEN_SYSTEM_PROCESSOR=arm",
+                        "-DCMAKE_C_FLAGS=-msimd128 -mfpu=neon -D__arm__=1",
+                        "-DCMAKE_CXX_FLAGS=-msimd128 -mfpu=neon -D__arm__=1"
+                    ]
+                }
+            ]
         },
         "build": {
             "cmake": {
@@ -220,7 +251,7 @@
         "depends": ["zlib"],
         "fetch": {
             "git": "https://github.com/hoene/libmysofa.git",
-            "tag": "da9e4adc619ee3d1ae5e68da3ed14aa5e60b3ec1"
+            "tag": "dd315a8ec1fee7193d40e4a59b12c5590a4a918c"
         },
         "configure": {
             "cmake": [
@@ -249,8 +280,18 @@
                 {
                     "stamp": false,
                     "flags": [
-                        "-DZLIB_ROOT=$deps/zlib/lib/$platform",
+                        "-DZLIB_ROOT=$deps/zlib/lib/$platform/$config",
                         "-DZLIB_INCLUDE_DIR=$deps/zlib/include"
+                    ]
+                },
+                {
+                    "platforms": ["wasm"],
+                    "flags": [
+                        "-DEMSCRIPTEN_SYSTEM_PROCESSOR=arm",
+                        "-DCMAKE_C_FLAGS=-msimd128 -mfpu=neon -D__linux__ -D__arm__=1",
+                        "-DCMAKE_CXX_FLAGS=-msimd128 -mfpu=neon -D__linux__ -D__arm__=1",
+                        "-DWIN32=1",
+                        "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH"
                     ]
                 }
             ]
@@ -274,17 +315,14 @@
                 ["simd"],
                 ["sys"],
                 ["tasking"],
-                ["embree"],
-                ["embree_sse42"],
-                ["embree_avx"],
-                ["embree_avx2"]
+                ["embree"]
             ]
         },
         "depends": ["ispc"],
         "fetch": {
-            "git": "https://github.com/embree/embree.git",
-            "tag": "8b2ad69f899ca0710f94d10303a2f02d7426faaf",
-            "patch": "embree.patch"
+            "git": "https://github.com/RenderKit/embree.git",
+            "tag": "ff9381774dc99fea81a932ad276677aad6a3d4dd",
+            "patch": "embree-linux-x86-simd.patch"
         },
         "configure": {
             "cmake": [
@@ -299,8 +337,27 @@
                         "-DEMBREE_GEOMETRY_LINES=OFF",
                         "-DEMBREE_GEOMETRY_HAIR=OFF",
                         "-DEMBREE_GEOMETRY_SUBDIV=OFF",
+                        "-DEMBREE_GEOMETRY_USER=OFF",
+                        "-DEMBREE_GEOMETRY_GRID=OFF",
+                        "-DEMBREE_GEOMETRY_POINT=OFF",
                         "-DEMBREE_TASKING_SYSTEM=INTERNAL",
+                        "-DEMBREE_LIBRARY_NAME=embree"
+                    ]
+                },
+                {
+                    "platforms": ["windows-x86", "windows-x64", "linux-x86", "linux-x64"],
+                    "flags": [
                         "-DEMBREE_MAX_ISA=AVX2"
+                    ]
+                },
+                {
+                    "platforms": ["osx"],
+                    "flags": [
+                        "-DEMBREE_ISA_SSE2=ON",
+                        "-DEMBREE_ISA_SSE42=OFF",
+                        "-DEMBREE_ISA_AVX=OFF",
+                        "-DEMBREE_ISA_AVX2=OFF",
+                        "-DEMBREE_ISA_AVX512=OFF"
                     ]
                 },
                 {
@@ -343,7 +400,7 @@
         },
         "install": true,
         "copy": [
-            ["install/$platform/include/embree2", "include"],
+            ["install/$platform/include/embree4", "include"],
             ["install/$platform/lib", "lib/$platform/$config"]
         ]
     },
@@ -535,6 +592,22 @@
             ["src/imgui/backends/imgui_impl_opengl2.cpp", "include"],
             ["src/imgui/backends/imgui_impl_glfw.h", "include"],
             ["src/imgui/backends/imgui_impl_glfw.cpp", "include"]
+        ]
+    },
+    "implot": {
+        "platforms": ["windows-x64"],
+        "check": {
+            "headers": ["implot.h"]
+        },
+        "fetch": {
+            "git": "https://github.com/epezent/implot.git",
+            "tag": "f156599faefe316f7dd20fe6c783bf87c8bb6fd9"
+        },
+        "copy": [
+            ["src/implot/implot.h", "include"],
+            ["src/implot/implot_internal.h", "include"],
+            ["src/implot/implot.cpp", "include"],
+            ["src/implot/implot_items.cpp", "include"]
         ]
     },
     "portaudio": {

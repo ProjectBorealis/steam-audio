@@ -20,6 +20,7 @@
 
 #include "propagation_medium.h"
 #include "sh.h"
+#include "profiler.h"
 
 namespace ipl {
 
@@ -111,6 +112,8 @@ void EmbreeReflectionSimulator::simulate(const IScene& scene,
                                          Array<float, 2>& image,
                                          JobGraph& jobGraph)
 {
+    PROFILE_FUNCTION();
+
     assert(numListeners == 1);
 
     // If we've been asked to simulate more sources than the max number we were initialized with, don't process the
@@ -171,6 +174,8 @@ void EmbreeReflectionSimulator::simulate(const IScene& scene,
                                          EnergyField* const* energyFields,
                                          JobGraph& jobGraph)
 {
+    PROFILE_FUNCTION();
+
     assert(numListeners == 1);
 
     // If we've been asked to simulate more sources than the max number we were initialized with, don't process the
@@ -229,7 +234,8 @@ void EmbreeReflectionSimulator::simulate(const IScene& scene,
 
         jobGraph.addJob([this, energyFields, start, end](int threadId, std::atomic<bool>& cancel)
         {
-            ispc::simulateEnergyField(&mScene, &mReflectionSimulator, start, end, threadId, mEnergyFields.data());
+            PROFILE_ZONE("ispc::simulateEnergyField");
+            ispc::simulateEnergyField(&mScene, &mReflectionSimulator, start, end, threadId, mEnergyFields.data(), Bands::kNumBands);
 
             if (--mNumJobsRemaining == 0)
             {
@@ -301,7 +307,7 @@ ispc::EmbreeScene EmbreeReflectionSimulator::ispcEmbreeScene(const EmbreeScene& 
 {
     ispc::EmbreeScene out;
     out.scene = in.scene();
-    out.materialsForGeometry = reinterpret_cast<const ispc::Material* const*>(in.materialsForGeometry());
+    out.materialsForGeometry = in.ispcMaterialsForGeometry();
     out.materialIndicesForGeometry = in.materialIndicesForGeometry();
     return out;
 }

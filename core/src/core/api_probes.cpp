@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+#include "baked_reflection_data.h"
 #include "probe_generator.h"
 #include "probe_batch.h"
 using namespace ipl;
@@ -27,6 +28,7 @@ using namespace ipl;
 #include "api_serialized_object.h"
 #include "api_scene.h"
 #include "api_probes.h"
+#include "api_energy_field.h"
 
 namespace api {
 
@@ -64,7 +66,7 @@ void CProbeArray::generateProbes(IScene* scene,
     if (!scene || !params)
         return;
 
-    const auto& _transform = *reinterpret_cast<Matrix4x4f*>(&params->transform);
+    auto _transform = reinterpret_cast<Matrix4x4f&>(params->transform).transposedCopy();
     auto _type = static_cast<ProbeGenerationType>(params->type);
 
     auto _scene = reinterpret_cast<CScene*>(scene)->mHandle.get();
@@ -101,6 +103,32 @@ IPLSphere CProbeArray::getProbe(IPLint32 index)
     *reinterpret_cast<Sphere*>(&sphere) = _probeArray->probes[index].influence;
 
     return sphere;
+}
+
+void CProbeArray::resize(IPLint32 size)
+{
+    if (size <= 0)
+        return;
+
+    auto _probeArray = mHandle.get();
+    if (!_probeArray)
+        return;
+
+    _probeArray->probes.resize(size);
+}
+
+void CProbeArray::setProbe(IPLint32 index, IPLSphere* probe)
+{
+    if (index < 0 || !probe)
+        return;
+
+    auto _probeArray = mHandle.get();
+    if (!_probeArray)
+        return;
+
+    const auto& _probe = *reinterpret_cast<Sphere*>(probe);
+
+    _probeArray->probes[index].influence = _probe;
 }
 
 
@@ -239,6 +267,57 @@ IPLsize CProbeBatch::getDataSize(IPLBakedDataIdentifier* identifier)
         return static_cast<IPLsize>((*_probeBatch)[_identifier].serializedSize());
     else
         return 0;
+}
+
+void CProbeBatch::getEnergyField(IPLBakedDataIdentifier* identifier, int probeIndex, IEnergyField* energyField)
+{
+    if (!identifier || !energyField)
+        return;
+
+    auto _probeBatch = mHandle.get();
+    if (!_probeBatch)
+        return;
+
+    const auto& _identifier = *reinterpret_cast<BakedDataIdentifier*>(identifier);
+    if (!_probeBatch->hasData(_identifier))
+        return;
+
+    if (probeIndex < 0 || _probeBatch->numProbes() <= probeIndex)
+        return;
+
+    auto _energyField = static_cast<CEnergyField*>(energyField)->mHandle.get();
+    if (!_energyField)
+        return;
+
+    auto _sourceEnergyField = static_cast<BakedReflectionsData&>((*_probeBatch)[_identifier]).lookupEnergyField(probeIndex);
+    if (!_sourceEnergyField)
+        return;
+
+    _energyField->reset();
+    _energyField->copyFrom(*_sourceEnergyField);
+}
+
+void CProbeBatch::getReverb(IPLBakedDataIdentifier* identifier, int probeIndex, float* reverbTimes)
+{
+    if (!identifier || !reverbTimes)
+        return;
+
+    auto _probeBatch = mHandle.get();
+    if (!_probeBatch)
+        return;
+
+    const auto& _identifier = *reinterpret_cast<BakedDataIdentifier*>(identifier);
+    if (!_probeBatch->hasData(_identifier))
+        return;
+
+    if (probeIndex < 0 || _probeBatch->numProbes() <= probeIndex)
+        return;
+
+    auto _sourceReverbTimes = static_cast<BakedReflectionsData&>((*_probeBatch)[_identifier]).lookupReverb(probeIndex);
+    if (!_sourceReverbTimes)
+        return;
+
+    memcpy(reverbTimes, _sourceReverbTimes->reverbTimes, Bands::kNumBands * sizeof(float));
 }
 
 

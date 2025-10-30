@@ -135,6 +135,9 @@ IPLAudioEffectState CPathEffect::apply(IPLPathEffectParams* params,
         _params.listener = reinterpret_cast<const CoordinateSpace3f*>(&params->listener);
     }
 
+    // todo: version check
+    _params.normalizeEQ = (params->normalizeEQ == IPL_TRUE);
+
     return static_cast<IPLAudioEffectState>(_effect->apply(_params, _in, _out));
 }
 
@@ -168,30 +171,6 @@ IPLerror CContext::createPathEffect(IPLAudioSettings* audioSettings,
     }
 
     return IPL_STATUS_SUCCESS;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// API Functions
-// --------------------------------------------------------------------------------------------------------------------
-
-IPLint32 IPLCALL iplPathEffectGetTailSize(IPLPathEffect effect)
-{
-    if (!effect)
-        return 0;
-
-    auto _effect = reinterpret_cast<api::CPathEffect*>(effect);
-
-    return _effect->getTailSize();
-}
-
-IPLAudioEffectState IPLCALL iplPathEffectGetTail(IPLPathEffect effect, IPLAudioBuffer* out)
-{
-    if (!effect)
-        return IPL_AUDIOEFFECTSTATE_TAILCOMPLETE;
-
-    auto _effect = reinterpret_cast<api::CPathEffect*>(effect);
-
-    return _effect->getTail(out);
 }
 
 }

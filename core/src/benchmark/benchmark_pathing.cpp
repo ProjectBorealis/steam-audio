@@ -30,12 +30,15 @@ void benchmarkVisGraphForSettings(IScene const& scene,
                                   const ProbeBatch& probes,
                                   float spacing,
                                   int numSamples,
-                                  float range)
+                                  float range,
+                                  int numThreads)
 {
-    auto numRuns = 10;
+    auto numRuns = 1;
     auto radius = (numSamples == 1) ? 0.0f : spacing;
     auto threshold = 0.99f;
     std::atomic<bool> cancel(false);
+
+    ThreadPool threadPool(numThreads);
 
     Timer timer;
     timer.start();
@@ -43,12 +46,15 @@ void benchmarkVisGraphForSettings(IScene const& scene,
     for (auto i = 0; i < numRuns; ++i)
     {
         ProbeVisibilityTester visTester(numSamples, true, -Vector3f::kYAxis);
-        ProbeVisibilityGraph visGraph(scene, probes, visTester, radius, threshold, range, 1, cancel);
+
+        JobGraph jobGraph{};
+        ProbeVisibilityGraph visGraph(scene, probes, visTester, radius, threshold, range, numThreads, jobGraph, cancel);
+        threadPool.process(jobGraph);
     }
 
     auto msElapsed = timer.elapsedMilliseconds() / numRuns;
 
-    PrintOutput("%-10d %-10.2f %-10.2f\n", numSamples, range, msElapsed);
+    PrintOutput("%-10d %-10d %-10.2f %-10.2f\n", numSamples, numThreads, range, msElapsed);
 }
 
 void benchmarkVisGraph(shared_ptr<Context> context,
@@ -68,17 +74,24 @@ void benchmarkVisGraph(shared_ptr<Context> context,
     probeBatch->addProbeArray(probes);
     probeBatch->commit();
 
-    PrintOutput("%-10s %-10s %-10s\n", "#samples", "range (m)", "time (ms)");
+    PrintOutput("Running benchmark: Visibility Graph...\n");
+    PrintOutput("%-10s %-10s %-10s %-10s\n", "#samples", "#threads", "range (m)", "time (ms)");
 
     int numSamplesValues[] = {1, 2, 4, 8};
     float rangeValues[] = {3.0f, 50.0f, INFINITY};
+    int numThreadsValues[] = {1, 2, 4, 8, 12, 16};
     for (auto numSamples : numSamplesValues)
     {
-        for (auto range : rangeValues)
+        for (auto numThreads : numThreadsValues)
         {
-            benchmarkVisGraphForSettings(*scene, *probeBatch, spacing, numSamples, range);
+            for (auto range : rangeValues)
+            {
+                benchmarkVisGraphForSettings(*scene, *probeBatch, spacing, numSamples, range, numThreads);
+            }
         }
     }
+
+    PrintOutput("\n");
 }
 
 void benchmarkPathFindingForSettings(IScene const& scene,
@@ -96,10 +109,11 @@ void benchmarkPathFindingForSettings(IScene const& scene,
 
     ProbeVisibilityTester visTester(numSamples, true, -Vector3f::kYAxis);
     PathFinder pathFinder(probes, 1);
+    const int kProbeSkip = 10;
 
-    for (int i = 0; i < numProbes; ++i)
+    for (int i = 0; i < numProbes; i += kProbeSkip)
     {
-        for (int j = 0; j < i; ++j)
+        for (int j = i + 1; j < numProbes; j += kProbeSkip)
         {
             Timer timer;
             double usElapsed = 0.0;
@@ -113,7 +127,6 @@ void benchmarkPathFindingForSettings(IScene const& scene,
             }
 
             int pathLength = std::min(static_cast<int>(probePath.nodes.size()), 4);
-
             counts[pathLength] += 1;
             times[pathLength] += usElapsed;
         }
@@ -122,7 +135,7 @@ void benchmarkPathFindingForSettings(IScene const& scene,
     for (int i = 0; i < 5; ++i)
     {
         double avgTime = (counts[i] == 0) ? 0.0 : (times[i] / counts[i]);
-        PrintOutput("%-10d %-10.2f %-10d %-10.2f\n", numSamples, range, i, avgTime);
+        PrintOutput("%-10d %-10.2f %-10d %-10d %-10.2f\n", numSamples, range, i, counts[i], avgTime);
     }
 }
 
@@ -143,21 +156,30 @@ void benchmarkPathFinding(shared_ptr<Context> context,
     probeBatch->addProbeArray(probes);
     probeBatch->commit();
 
-    PrintOutput("%-10s %-10s %-10s %-10s\n", "#samples", "range (m)", "length", "time (us)");
+    PrintOutput("Running benchmark: Realtime Pathing...\n");
+    PrintOutput("%-10s %-10s %-10s %-10s %-10s\n", "#samples", "range (m)", "length", "count", "time (us)");
 
     int numSamplesValues[] = {1, 2};
     float rangeValues[] = {3.0f, 50.0f, INFINITY};
     std::atomic<bool> cancel(false);
+
+    ThreadPool threadPool(1);
 
     for (auto numSamples : numSamplesValues)
     {
         for (auto range : rangeValues)
         {
             ProbeVisibilityTester visTester(numSamples, true, -Vector3f::kYAxis);
-            ProbeVisibilityGraph visGraph(*scene, *probeBatch, visTester, spacing, 0.99f, range, 1, cancel);
+
+            JobGraph jobGraph{};
+            ProbeVisibilityGraph visGraph(*scene, *probeBatch, visTester, spacing, 0.99f, range, 1, jobGraph, cancel);
+            threadPool.process(jobGraph);
+
             benchmarkPathFindingForSettings(*scene, *probeBatch, visGraph, numSamples, spacing, 0.99f, range);
         }
     }
+
+    PrintOutput("\n");
 }
 
 void benchmarkPathingForSettings(shared_ptr<Context> context, shared_ptr<IScene> scene, int visSamples, int ambisonicsOrder)
@@ -210,17 +232,16 @@ void benchmarkPathingForSettings(shared_ptr<Context> context, shared_ptr<IScene>
     Array<float, 1> eqGains(Bands::kNumBands);
     Array<float, 1> coeffs(kNumCoeffs);
 
-    float pathCounts[] = { .0f, .0f, .0f, .0f, .0f };
-    double pathFindTimes[] = { .0, .0, .0, .0, .0 };
+    float totalTime = .0f;
+    int totalProbesBenchmarked = 0;
+    const int kProbeSkip = 10;
 
-    for (int i = 0; i < numProbes; ++i)
+    for (int i = 0; i < numProbes; i += kProbeSkip)
     {
-        for (int j = i + 1; j < numProbes; ++j)
+        for (int j = i + 1; j < numProbes; j += kProbeSkip)
         {
             auto &_source = probes[i].influence.center;
             auto &_listener = probes[j].influence.center;
-
-            vector<ProbePath> paths;
 
             Timer timer;
             timer.start();
@@ -237,31 +258,16 @@ void benchmarkPathingForSettings(shared_ptr<Context> context, shared_ptr<IScene>
 
                 pathSimulator.findPaths(_source, _listener, *scene, *probeBatch, sourceProbes, listenerProbes, kProbeVisRadius,
                                         kProbeVisThreshold, kProbeVisRange, kOrder, true, true, true, true,
-                                        eqGains.data(), coeffs.data());
+                                        eqGains.data(), coeffs.data(), DistanceAttenuationModel{}, DeviationModel{});
             }
-            auto elapsedMicroSeconds = timer.elapsedMicroseconds();
 
-            for (auto k = 0u; k < paths.size(); ++k)
-            {
-                if (!paths[k].valid)
-                    continue;
-
-                // Paths of different lengths in one call to findPaths are all assigned the
-                // same values.
-                int index = paths[k].nodes.size() >= 4 ? 4 : static_cast<int>(paths[k].nodes.size());
-                pathCounts[index]++;
-                pathFindTimes[index] += elapsedMicroSeconds;
-            }
+            totalTime += static_cast<float>(timer.elapsedMicroseconds());
+            ++totalProbesBenchmarked;
         }
     }
 
-    PrintOutput("%-8.2f  %-8d  %-10d  %-8d  %6.2f  %5.2f  %5.2f  %5.2f  %5.2f\n",
-        spacing, numProbes, ambisonicsOrder, visSamples,
-        (pathCounts[0] > 0) ? pathFindTimes[0] / pathCounts[0] : .0f,
-        (pathCounts[1] > 0) ? pathFindTimes[1] / pathCounts[1] : .0f,
-        (pathCounts[2] > 0) ? pathFindTimes[2] / pathCounts[2] : .0f,
-        (pathCounts[3] > 0) ? pathFindTimes[3] / pathCounts[3] : .0f,
-        (pathCounts[4] > 0) ? pathFindTimes[4] / pathCounts[4] : .0f);
+    PrintOutput("%-8.2f  %-8d  %-10d  %-8d  %6.2f\n",
+        spacing, numProbes, ambisonicsOrder, visSamples, totalTime / totalProbesBenchmarked );
 }
 
 BENCHMARK(pathing)
@@ -278,13 +284,11 @@ BENCHMARK(pathing)
     auto type = SceneType::Default;
 
     Material material;
-    material.absorption[0] = 0.1f;
-    material.absorption[1] = 0.1f;
-    material.absorption[2] = 0.1f;
+    for (auto iBand = 0; iBand < Bands::kNumBands; ++iBand)
+        material.absorption[iBand] = 0.1f;
     material.scattering = 0.5f;
-    material.transmission[0] = 1.0f;
-    material.transmission[1] = 1.0f;
-    material.transmission[2] = 1.0f;
+    for (auto iBand = 0; iBand < Bands::kNumBands; ++iBand)
+        material.transmission[iBand] = 1.0f;
 
     auto scene = shared_ptr<IScene>(SceneFactory::create(type, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr));
 
@@ -295,11 +299,10 @@ BENCHMARK(pathing)
     scene->commit();
 
     benchmarkVisGraph(context, scene);
-
     benchmarkPathFinding(context, scene);
 
     PrintOutput("Running benchmark: Pathing Runtime...\n");
-    PrintOutput("%-8s  %-8s  %-10s  %-8s  %6s  %5s  %5s  %5s  %5s\n", "Spacing", "#Probes", "Ambisonics", "Samples", "(us) 0", "1", "2", "3", "4+");
+    PrintOutput("%-8s  %-8s  %-10s  %-8s %6s\n", "Spacing", "#Probes", "Ambisonics", "Samples", "(us) Time");
 
     benchmarkPathingForSettings(context, scene, 1, 0);
     benchmarkPathingForSettings(context, scene, 2, 0);

@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.17)
 
-project(Phonon VERSION 4.5.3)
+project(Phonon VERSION 4.7.0)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_HOME_DIRECTORY}/build")
@@ -37,6 +37,8 @@ elseif (APPLE AND (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUA
     if (CMAKE_XCODE_ATTRIBUTE_SDKROOT STREQUAL "iphonesimulator")
         set(IPL_IOS_SIMULATOR TRUE)
     endif()
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(IPL_OS_WASM TRUE)
 endif()
 
 # CPU architecture detection
@@ -69,6 +71,8 @@ elseif (IPL_OS_ANDROID)
     endif()
 elseif (IPL_OS_IOS)
     set(IPL_CPU_ARMV8 TRUE)
+elseif (IPL_OS_WASM)
+    set(IPL_CPU_ARMV7 TRUE)
 endif()
 
 
@@ -78,6 +82,9 @@ endif()
 
 # Whether to compile a static or dynamic library
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static." ON)
+
+# Whether to enable octave band support (experimental).
+option(STEAMAUDIO_ENABLE_OCTAVE_BANDS "Enable octave band support (experimental)." OFF)
 
 option(STEAMAUDIO_BUILD_TESTS "Build unit tests." ON)
 option(STEAMAUDIO_BUILD_BENCHMARKS "Build benchmarks." ON)
@@ -102,7 +109,7 @@ if ((IPL_OS_WINDOWS AND (IPL_CPU_X86 OR IPL_CPU_X64)) OR (IPL_OS_LINUX AND (IPL_
 endif()
 
 if (IPL_OS_ANDROID)
-    option(STEAMAUDIO_ENABLE_FFTS "Enable FFTS for FFT operations." ON)
+    option(STEAMAUDIO_ENABLE_FFTS "Enable FFTS for FFT operations." OFF)
 endif()
 
 if (IPL_OS_WINDOWS AND IPL_CPU_X64)
@@ -114,36 +121,6 @@ endif()
 #
 # COMPILER FLAGS
 #
-
-# Flags determined by system introspection
-if (IPL_OS_WINDOWS)
-    add_definitions(-DIPL_OS_WINDOWS)
-endif()
-if (IPL_OS_LINUX)
-    add_definitions(-DIPL_OS_LINUX)
-endif()
-if (IPL_OS_MACOS)
-    add_definitions(-DIPL_OS_MACOSX)
-endif()
-if (IPL_OS_ANDROID)
-    add_definitions(-DIPL_OS_ANDROID)
-endif()
-if (IPL_OS_IOS)
-    add_definitions(-DIPL_OS_IOS)
-endif()
-
-if (IPL_CPU_X86)
-    add_definitions(-DIPL_CPU_X86)
-endif()
-if (IPL_CPU_X64)
-    add_definitions(-DIPL_CPU_X64)
-endif()
-if (IPL_CPU_ARMV7)
-    add_definitions(-DIPL_CPU_ARMV7)
-endif()
-if (IPL_CPU_ARMV8)
-    add_definitions(-DIPL_CPU_ARM64)
-endif()
 
 # Windows flags
 if (IPL_OS_WINDOWS)
@@ -209,15 +186,30 @@ if (IPL_OS_ANDROID)
     include_directories(SYSTEM ${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1)
 
     add_link_options(-static-libstdc++)
+
+    # Enable 16 KB page size support. (https://developer.android.com/about/versions/15/behavior-changes-all#16-kb)
+    add_link_options("-Wl,-z,max-page-size=16384")
 endif()
 
 # iOS flags
 # todo
 
+# WASM flags
+if (IPL_OS_WASM)
+    add_compile_options(-msimd128 -mfpu=neon)
+    add_link_options(-sALLOW_MEMORY_GROWTH=1 -sSINGLE_FILE=1)
+endif()
+
 
 #
 # DEPENDENCIES
 #
+
+# Octave bands are not currently supported when using Radeon Rays.
+if (STEAMAUDIO_ENABLE_OCTAVE_BANDS)
+    set(STEAMAUDIO_ENABLE_RADEONRAYS OFF)
+    set(STEAMAUDIO_ENABLE_TRUEAUDIONEXT OFF)
+endif()
 
 if (STEAMAUDIO_ENABLE_IPP)
     find_package(IPP)
@@ -257,7 +249,7 @@ find_package(FlatBuffers REQUIRED)
 
 if (STEAMAUDIO_ENABLE_EMBREE)
     find_package(ISPC 1.12 EXACT)
-    find_package(Embree 2.17 EXACT)
+    find_package(Embree 4)
     if (NOT ISPC_FOUND OR NOT Embree_FOUND)
         message(STATUS "Disabling Embree")
         set(STEAMAUDIO_ENABLE_EMBREE OFF)
@@ -296,9 +288,10 @@ endif()
 if (STEAMAUDIO_BUILD_ITESTS)
     find_package(GLFW)
     find_package(IMGUI)
+    find_package(IMPLOT)
     find_package(PortAudio)
     find_package(DRWAV)
-    if (NOT GLFW_FOUND OR NOT IMGUI_FOUND OR NOT PortAudio_FOUND OR NOT DRWAV_FOUND)
+    if (NOT GLFW_FOUND OR NOT IMGUI_FOUND OR NOT IMPLOT_FOUND OR NOT PortAudio_FOUND OR NOT DRWAV_FOUND)
         message(STATUS "Disabling interactive tests")
         set(STEAMAUDIO_BUILD_ITESTS OFF)
     endif()
@@ -316,7 +309,15 @@ if (STEAMAUDIO_BUILD_DOCS)
     endif()
 endif()
 
-include(CMakeListsInternal.txt OPTIONAL)
+include(CMakeListsInternal.txt OPTIONAL RESULT_VARIABLE STEAMAUDIO_INTERNAL_MODE)
+if (NOT STEAMAUDIO_INTERNAL_MODE)
+    set(STEAMAUDIO_PROFILING_TOOLS "None;Generic")
+    set(STEAMAUDIO_PROFILING_TOOL "None" CACHE STRING "${STEAMAUDIO_PROFILING_TOOLS}")
+
+    if(NOT STEAMAUDIO_PROFILING_TOOL IN_LIST STEAMAUDIO_PROFILING_TOOLS)
+        message(FATAL_ERROR "Invalid option selected: ${STEAMAUDIO_PROFILING_TOOL}. Must be one of: ${STEAMAUDIO_PROFILING_TOOLS}.")
+    endif()
+endif()
 
 # Flags determined by options
 if (STEAMAUDIO_ENABLE_AVX)
@@ -349,6 +350,10 @@ endif()
 
 if (STEAMAUDIO_ENABLE_TRUEAUDIONEXT)
     add_definitions(-DIPL_USES_TRUEAUDIONEXT)
+endif()
+
+if (STEAMAUDIO_ENABLE_OCTAVE_BANDS)
+    add_definitions(-DIPL_ENABLE_OCTAVE_BANDS)
 endif()
 
 
@@ -407,6 +412,7 @@ set(CPACK_INSTALLED_DIRECTORIES
     ${CMAKE_INSTALL_PREFIX}/lib/android-x86 lib/android-x86
     ${CMAKE_INSTALL_PREFIX}/lib/android-x64 lib/android-x64
     ${CMAKE_INSTALL_PREFIX}/lib/ios lib/ios
+    ${CMAKE_INSTALL_PREFIX}/lib/wasm lib/wasm
     ${CMAKE_INSTALL_PREFIX}/doc doc
     ${CMAKE_INSTALL_PREFIX}/symbols/windows-x86 symbols/windows-x86
     ${CMAKE_INSTALL_PREFIX}/symbols/windows-x64 symbols/windows-x64

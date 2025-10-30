@@ -52,6 +52,11 @@ public:
     virtual IPLint32 getNumProbes() override;
 
     virtual IPLSphere getProbe(IPLint32 index) override;
+
+    void resize(IPLint32 size);
+
+    void setProbe(IPLint32 index, 
+                  IPLSphere* probe);
 };
 
 
@@ -63,6 +68,8 @@ class CProbeBatch : public IProbeBatch
 {
 public:
     Handle<ProbeBatch> mHandle;
+
+    CProbeBatch() = default;
 
     CProbeBatch(CContext* context);
 
@@ -88,6 +95,10 @@ public:
     virtual void removeData(IPLBakedDataIdentifier* identifier) override;
 
     virtual IPLsize getDataSize(IPLBakedDataIdentifier* identifier) override;
+
+    virtual void getEnergyField(IPLBakedDataIdentifier* identifier, int probeIndex, IEnergyField* energyField) override;
+
+    virtual void getReverb(IPLBakedDataIdentifier* identifier, int probeIndex, float* reverbTimes) override;
 };
 
 }

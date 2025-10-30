@@ -37,6 +37,8 @@ struct ReverbEffectParams
 class ReverbEffect
 {
 public:
+    static float sMinAbsorptiveGain;
+
     ReverbEffect(const AudioSettings& audioSettings);
 
     void reset();
@@ -53,7 +55,7 @@ public:
 
 private:
     static constexpr int kNumDelays = 16;
-    static constexpr int kNumAllpassDelays = 4;
+    static constexpr int kNumAllpasses = 4;
     static constexpr float kToneCorrectionWeight = 0.5f;
 
     int mSamplingRate;
@@ -62,8 +64,7 @@ private:
     Delay mDelayLines[kNumDelays];
     int mCurrent;
     bool mIsFirstFrame;
-    Delay mAllpassX[kNumDelays][2];
-    Delay mAllpassY[kNumDelays][2];
+    Allpass mAllpass[kNumAllpasses];
     IIRFilterer mAbsorptive[kNumDelays][Bands::kNumBands][2];
     IIRFilterer mToneCorrection[Bands::kNumBands][2];
     Array<float, 2> mXOld;

@@ -41,18 +41,21 @@ void IPL_FLOAT8_ATTR ReverbEffect::apply_float8(const float* reverbTimes,
 
     memset(out, 0, mFrameSize * sizeof(float));
 
-    float const lowCutoff[Bands::kNumBands] = {20.0f, 500.0f, 5000.0f};
-    float const highCutoff[Bands::kNumBands] = {500.0f, 5000.0f, 22000.0f};
-
     for (auto i = 0; i < kNumDelays; ++i)
     {
         float absorptiveGains[Bands::kNumBands];
         calcAbsorptiveGains(clampedReverbTimes, mDelayValues[i], absorptiveGains);
 
         IIR iir[Bands::kNumBands];
-        iir[0] = IIR::lowShelf(highCutoff[0], absorptiveGains[0], mSamplingRate);
-        iir[1] = IIR::peaking(lowCutoff[1], highCutoff[1], absorptiveGains[1], mSamplingRate);
-        iir[2] = IIR::highShelf(lowCutoff[2], absorptiveGains[2], mSamplingRate);
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            if (j == 0)
+                iir[j] = IIR::lowShelf(Bands::kHighCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+            else if (j == Bands::kNumBands - 1)
+                iir[j] = IIR::highShelf(Bands::kLowCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+            else
+                iir[j] = IIR::peaking(Bands::kLowCutoffFrequencies[j], Bands::kHighCutoffFrequencies[j], absorptiveGains[j], mSamplingRate);
+        }
 
         for (auto j = 0; j < Bands::kNumBands; ++j)
         {
@@ -64,9 +67,15 @@ void IPL_FLOAT8_ATTR ReverbEffect::apply_float8(const float* reverbTimes,
     calcToneCorrectionGains(clampedReverbTimes, toneCorrectionGains);
 
     IIR iir[Bands::kNumBands];
-    iir[0] = IIR::lowShelf(highCutoff[0], toneCorrectionGains[0], mSamplingRate);
-    iir[1] = IIR::peaking(lowCutoff[1], highCutoff[1], toneCorrectionGains[1], mSamplingRate);
-    iir[2] = IIR::highShelf(lowCutoff[2], toneCorrectionGains[2], mSamplingRate);
+    for (auto j = 0; j < Bands::kNumBands; ++j)
+    {
+        if (j == 0)
+            iir[j] = IIR::lowShelf(Bands::kHighCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+        else if (j == Bands::kNumBands - 1)
+            iir[j] = IIR::highShelf(Bands::kLowCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+        else
+            iir[j] = IIR::peaking(Bands::kLowCutoffFrequencies[j], Bands::kHighCutoffFrequencies[j], toneCorrectionGains[j], mSamplingRate);
+    }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)
     {
@@ -76,6 +85,11 @@ void IPL_FLOAT8_ATTR ReverbEffect::apply_float8(const float* reverbTimes,
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].get(mFrameSize, mXOld[i]);
+
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXOld[i], mXOld[i]);
+        }
     }
 
     float8_t xOld[kNumDelays];
@@ -97,11 +111,6 @@ void IPL_FLOAT8_ATTR ReverbEffect::apply_float8(const float* reverbTimes,
 
     for (auto i = 0; i < kNumDelays; ++i)
     {
-        for (auto j = 0; j < Bands::kNumBands; ++j)
-        {
-            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXNew[i], mXNew[i]);
-        }
-
         ArrayMath::add(mFrameSize, mXNew[i], in, mXNew[i]);
 
         mDelayLines[i].put(mFrameSize, mXNew[i]);
@@ -114,24 +123,16 @@ void IPL_FLOAT8_ATTR ReverbEffect::apply_float8(const float* reverbTimes,
 
     ArrayMath::scale(mFrameSize, mXOld[0], 1.0f / kNumDelays, mXOld[0]);
 
-    float8_t xm, ym;
-    auto g = float8::set1(0.25f);
     for (auto i = 0; i < mFrameSize; i += 8)
     {
-        auto v = float8::loadu(&mXOld[0][i]);
+        xOld[0] = float8::loadu(&mXOld[0][i]);
 
-        for (auto k = 0; k < 2; ++k)
+        for (auto j = 0; j < kNumAllpasses; ++j)
         {
-            auto x = v;
-            mAllpassX[0][k].get(xm);
-            mAllpassY[1][k].get(ym);
-            auto y = float8::sub(float8::add(xm, float8::mul(g, ym)), float8::mul(g, x));
-            mAllpassX[0][k].put(x);
-            mAllpassY[1][k].put(y);
-            v = y;
+            xOld[0] = mAllpass[j].apply(xOld[0]);
         }
 
-        float8::storeu(&out[i], v);
+        float8::storeu(&out[i], xOld[0]);
     }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)
@@ -147,6 +148,11 @@ void IPL_FLOAT8_ATTR ReverbEffect::tail_float8(float* out)
     for (auto i = 0; i < kNumDelays; ++i)
     {
         mDelayLines[i].get(mFrameSize, mXOld[i]);
+
+        for (auto j = 0; j < Bands::kNumBands; ++j)
+        {
+            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXOld[i], mXOld[i]);
+        }
     }
 
     float8_t xOld[kNumDelays];
@@ -168,11 +174,6 @@ void IPL_FLOAT8_ATTR ReverbEffect::tail_float8(float* out)
 
     for (auto i = 0; i < kNumDelays; ++i)
     {
-        for (auto j = 0; j < Bands::kNumBands; ++j)
-        {
-            mAbsorptive[i][j][mCurrent].apply(mFrameSize, mXNew[i], mXNew[i]);
-        }
-
         mDelayLines[i].put(mFrameSize, mXNew[i]);
     }
 
@@ -183,24 +184,16 @@ void IPL_FLOAT8_ATTR ReverbEffect::tail_float8(float* out)
 
     ArrayMath::scale(mFrameSize, mXOld[0], 1.0f / kNumDelays, mXOld[0]);
 
-    float8_t xm, ym;
-    auto g = float8::set1(0.25f);
     for (auto i = 0; i < mFrameSize; i += 8)
     {
-        auto v = float8::loadu(&mXOld[0][i]);
+        xOld[0] = float8::loadu(&mXOld[0][i]);
 
-        for (auto k = 0; k < 2; ++k)
+        for (auto j = 0; j < kNumAllpasses; ++j)
         {
-            auto x = v;
-            mAllpassX[0][k].get(xm);
-            mAllpassY[1][k].get(ym);
-            auto y = float8::sub(float8::add(xm, float8::mul(g, ym)), float8::mul(g, x));
-            mAllpassX[0][k].put(x);
-            mAllpassY[1][k].put(y);
-            v = y;
+            xOld[0] = mAllpass[j].apply(xOld[0]);
         }
 
-        float8::storeu(&out[i], v);
+        float8::storeu(&out[i], xOld[0]);
     }
 
     for (auto i = 0; i < Bands::kNumBands; ++i)

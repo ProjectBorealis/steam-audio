@@ -104,14 +104,12 @@ IPLAudioEffectState CDirectEffect::apply(IPLDirectEffectParams* params,
     DirectEffectParams _params{};
 
     _params.directPath.distanceAttenuation = params->distanceAttenuation;
-    _params.directPath.airAbsorption[0] = params->airAbsorption[0];
-    _params.directPath.airAbsorption[1] = params->airAbsorption[1];
-    _params.directPath.airAbsorption[2] = params->airAbsorption[2];
+    for (auto iBand = 0; iBand < Bands::kNumBands; ++iBand)
+        _params.directPath.airAbsorption[iBand] = params->airAbsorption[iBand];
     _params.directPath.directivity = params->directivity;
     _params.directPath.occlusion = params->occlusion;
-    _params.directPath.transmission[0] = params->transmission[0];
-    _params.directPath.transmission[1] = params->transmission[1];
-    _params.directPath.transmission[2] = params->transmission[2];
+    for (auto iBand = 0; iBand < Bands::kNumBands; ++iBand)
+        _params.directPath.transmission[iBand] = params->transmission[iBand];
 
     _params.flags = static_cast<DirectEffectFlags>(params->flags);
     _params.transmissionType = static_cast<TransmissionType>(params->transmissionType);
@@ -149,30 +147,6 @@ IPLerror CContext::createDirectEffect(IPLAudioSettings* audioSettings,
     }
 
     return IPL_STATUS_SUCCESS;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// API Functions
-// --------------------------------------------------------------------------------------------------------------------
-
-IPLint32 IPLCALL iplDirectEffectGetTailSize(IPLDirectEffect effect)
-{
-    if (!effect)
-        return 0;
-
-    auto _effect = reinterpret_cast<api::CDirectEffect*>(effect);
-
-    return _effect->getTailSize();
-}
-
-IPLAudioEffectState IPLCALL iplDirectEffectGetTail(IPLDirectEffect effect, IPLAudioBuffer* out)
-{
-    if (!effect)
-        return IPL_AUDIOEFFECTSTATE_TAILCOMPLETE;
-
-    auto _effect = reinterpret_cast<api::CDirectEffect*>(effect);
-
-    return _effect->getTail(out);
 }
 
 }

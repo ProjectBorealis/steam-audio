@@ -8,13 +8,16 @@ Functions
 .. doxygenfunction:: iplFMODInitialize
 .. doxygenfunction:: iplFMODTerminate
 .. doxygenfunction:: iplFMODSetHRTF
+.. doxygenfunction:: iplFMODSetHRTFDisabled
 .. doxygenfunction:: iplFMODSetSimulationSettings
 .. doxygenfunction:: iplFMODSetReverbSource
+.. doxygenfunction:: iplFMODAddSource
+.. doxygenfunction:: iplFMODRemoveSource
 
 
 DSP Parameters
 ^^^^^^^^^^^^^^
 
-.. doxygenenum:: SpatializeEffect::Params
-.. doxygenenum:: ReverbEffect::Params
-.. doxygenenum:: MixerReturnEffect::Params
+.. doxygenenum:: IPLSpatializerParams
+.. doxygenenum:: IPLReverbParams
+.. doxygenenum:: IPLMixerReturnParams

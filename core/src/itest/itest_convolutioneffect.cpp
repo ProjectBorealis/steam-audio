@@ -29,7 +29,7 @@ ITEST(convolutioneffect)
 {
     auto context = std::make_shared<Context>(nullptr, nullptr, nullptr, SIMDLevel::AVX2, STEAMAUDIO_VERSION);
 
-    SceneType sceneType = SceneType::Default;
+    SceneType sceneType = SceneType::Embree;
     IndirectEffectType indirectType = IndirectEffectType::Convolution;
 	auto embree = (sceneType == SceneType::Embree) ? make_shared<EmbreeDevice>() : nullptr;
 
@@ -70,10 +70,9 @@ ITEST(convolutioneffect)
     source->reflectionInputs.distanceAttenuationModel = DistanceAttenuationModel{};
     source->reflectionInputs.airAbsorptionModel = AirAbsorptionModel{};
     source->reflectionInputs.directivity = Directivity{};
-    source->reflectionInputs.reverbScale[0] = 1.0f;
-    source->reflectionInputs.reverbScale[1] = 1.0f;
-    source->reflectionInputs.reverbScale[2] = 1.0f;
-    source->reflectionInputs.transitionTime = 1.0f;
+    for (auto i = 0; i < Bands::kNumBands; ++i)
+        source->reflectionInputs.reverbScale[i] = 1.0f;
+    source->reflectionInputs.transitionTime = 0.1f;
     source->reflectionInputs.overlapFraction = 0.25f;
     source->reflectionInputs.baked = false;
 
@@ -91,7 +90,12 @@ ITEST(convolutioneffect)
     convolutionSettings.numChannels = ambisonicsBufferChannels;
     convolutionSettings.irSize = static_cast<int>(ceilf(1.0f * audioSettings.samplingRate));
 
-    OverlapSaveConvolutionEffect convolutionEffect(audioSettings, convolutionSettings);
+    HybridReverbEffectSettings hybrid_settings{};
+    hybrid_settings.numChannels = convolutionSettings.numChannels;
+    hybrid_settings.irSize = convolutionSettings.irSize;
+
+    auto convolutionEffect = ipl::make_unique<OverlapSaveConvolutionEffect>(audioSettings, convolutionSettings);
+    auto hybrid_effect = ipl::make_unique<HybridReverbEffect>(audioSettings, hybrid_settings);
 #if defined(IPL_USES_TRUEAUDIONEXT)
 	TANConvolutionEffect tanEffect;
 	TANConvolutionMixer tanMixer;
@@ -116,9 +120,17 @@ ITEST(convolutioneffect)
 			"Linear"
 		};
 
-		ImGui::SliderFloat3("Reverb Scale", source->reflectionInputs.reverbScale, 0.1f, 10.0f);
+        for (auto i = 0; i < Bands::kNumBands; ++i)
+        {
+            char label[32] = {0};
+            sprintf(label, "Reverb Scale %d", i);
+
+            ImGui::SliderFloat(label, &source->reflectionInputs.reverbScale[i], 0.1f, 10.0f);
+        }
+
 		ImGui::Combo("Reconstruction Type", reinterpret_cast<int*>(&sharedData.reflection.reconstructionType), reconstructionTypes, 2);
 		ImGui::SliderFloat("IR Duration", &source->reflectionInputs.transitionTime, 0.1f, 2.0f);
+        ImGui::Checkbox("8th Order", &IIR::sUseOrder8);
 	};
 
     auto display = [&]()
@@ -145,9 +157,9 @@ ITEST(convolutioneffect)
     {
         AudioBuffer::downmix(inBuffer, mono);
 
-#if defined(IPL_USES_TRUEAUDIONEXT)
 		if (indirectType == IndirectEffectType::TrueAudioNext)
 		{
+#if defined(IPL_USES_TRUEAUDIONEXT)
             TANConvolutionEffectParams tanParams{};
             tanParams.tan = tan.get();
             tanParams.slot = source->reflectionOutputs.tanSlot;
@@ -158,16 +170,28 @@ ITEST(convolutioneffect)
             tanMixerParams.tan = tan.get();
 
 			tanMixer.apply(tanMixerParams, ambisonics);
-		}
-		else
 #endif
+        }
+        else if (indirectType == IndirectEffectType::Hybrid)
+        {
+            HybridReverbEffectParams hybrid_params{};
+            hybrid_params.fftIR = &source->reflectionOutputs.overlapSaveFIR;
+            hybrid_params.numChannels = ambisonicsBufferChannels;
+            hybrid_params.numSamples = hybrid_settings.irSize;
+            hybrid_params.reverb = &source->reflectionOutputs.reverb;
+            hybrid_params.eqCoeffs = source->reflectionOutputs.hybridEQ;
+            hybrid_params.delay = source->reflectionOutputs.hybridDelay;
+
+            hybrid_effect->apply(hybrid_params, mono, ambisonics);
+        }
+		else
 		{
             OverlapSaveConvolutionEffectParams convolutionParams{};
             convolutionParams.fftIR = &source->reflectionOutputs.overlapSaveFIR;
             convolutionParams.numChannels = ambisonicsBufferChannels;
             convolutionParams.numSamples = convolutionSettings.irSize;
 
-			convolutionEffect.apply(convolutionParams, mono, ambisonics);
+			convolutionEffect->apply(convolutionParams, mono, ambisonics);
 		}
 
         AmbisonicsBinauralEffectParams binauralParams{};
@@ -190,7 +214,7 @@ ITEST(convolutioneffect)
             if (effectState == AudioEffectState::TailRemaining)
             {
                 // convolution effect still has tail
-                effectState = convolutionEffect.tail(ambisonics);
+                effectState = convolutionEffect->tail(ambisonics);
 
                 AmbisonicsBinauralEffectParams binauralParams{};
                 binauralParams.hrtf = &hrtf;

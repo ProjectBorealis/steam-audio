@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#if defined(IPL_OS_WINDOWS) || defined(IPL_OS_LINUX) || defined(IPL_OS_MACOSX) || defined(IPL_OS_ANDROID) || defined(IPL_OS_IOS)
+#if defined(IPL_OS_WINDOWS) || defined(IPL_OS_LINUX) || defined(IPL_OS_MACOSX) || defined(IPL_OS_ANDROID) || defined(IPL_OS_IOS) || defined(IPL_OS_WASM)
 
 #include "error.h"
 #include "log.h"
@@ -34,7 +34,7 @@ SOFAHRTFMap::SOFAHRTFMap(const HRTFSettings& hrtfSettings,
 
     if (hrtfSettings.sofaFileName)
     {
-        mSOFA = mysofa_open(hrtfSettings.sofaFileName, static_cast<float>(samplingRate), &mNumSamples, &status);
+        mSOFA = mysofa_open_no_norm(hrtfSettings.sofaFileName, static_cast<float>(samplingRate), &mNumSamples, &status);
         if (status != MYSOFA_OK)
         {
             gLog().message(MessageSeverity::Error, "Unable to load SOFA file: %s. [%d]", hrtfSettings.sofaFileName, status);
@@ -43,7 +43,7 @@ SOFAHRTFMap::SOFAHRTFMap(const HRTFSettings& hrtfSettings,
     }
     else if (hrtfSettings.sofaData)
     {
-        mSOFA = mysofa_open_data(reinterpret_cast<const char*>(hrtfSettings.sofaData), hrtfSettings.sofaDataSize,
+        mSOFA = mysofa_open_data_no_norm(reinterpret_cast<const char*>(hrtfSettings.sofaData), hrtfSettings.sofaDataSize,
             static_cast<float>(samplingRate), &mNumSamples, &status);
         if (status != MYSOFA_OK)
         {
