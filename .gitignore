@@ -11,6 +11,8 @@ fmod/lib
 unreal/src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib
 unreal/src/SteamAudioUnreal/Plugins/FMODStudio/Binaries
 
+unity/lib
+
 unity/src/project/SteamAudioUnity/Assets/Plugins/FMOD/platforms/mac/lib/*.bundle
 unity/src/project/SteamAudioUnity/Assets/Plugins/FMOD/platforms/win/lib/**/*.dll
 unity/src/project/SteamAudioUnity/Assets/Plugins/SteamAudio/Binaries/**/*.so
@@ -21,3 +23,5 @@ unity/src/project/SteamAudioUnity/Assets/Plugins/SteamAudio/Binaries/**/*.bundle
 /core/deps
 /core/deps-build
 /core/cmake_msbuild_*.txt
+/core/bin
+/core/dist
