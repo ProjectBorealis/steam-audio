@@ -42,7 +42,7 @@ ITEST(convolutioneffect)
     auto radeonRays = nullptr;
 #endif
 
-#if defined(IPL_USES_TRUEAUDIONEXT)
+#if defined(IPL_USES_OPENCL) && defined(IPL_USES_RADEONRAYS) && defined(IPL_USES_TRUEAUDIONEXT)
 	auto tan = (indirectType == IndirectEffectType::TrueAudioNext) ? ipl::make_shared<TANDevice>(openCL->convolutionQueue(), openCL->irUpdateQueue(), 1024, 48000, 1, 1) : nullptr;
 #else
     auto tan = ipl::make_shared<TANDevice>();
