@@ -14,6 +14,7 @@
             "cmake": [
                 {
                     "flags": [
+                        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                         "-DFLATBUFFERS_BUILD_FLATLIB=FALSE",
                         "-DFLATBUFFERS_BUILD_FLATHASH=FALSE",
                         "-DFLATBUFFERS_BUILD_TESTS=FALSE"
@@ -90,6 +91,7 @@
             "cmake": [
                 {
                     "flags": [
+                        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                         "-DPFFFT_USE_TYPE_DOUBLE=OFF",
                         "-DPFFFT_USE_FFTPACK=OFF",
                         "-DPFFFT_USE_BENCH_GREEN=OFF",
@@ -624,6 +626,7 @@
             "cmake": [
                 {
                     "flags": [
+                        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                         "-DPA_BUILD_SHARED=OFF"
                     ]
                 }
