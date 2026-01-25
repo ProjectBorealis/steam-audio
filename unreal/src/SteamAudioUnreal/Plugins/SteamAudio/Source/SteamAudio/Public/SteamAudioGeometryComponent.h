@@ -62,9 +62,6 @@ public:
 
     USteamAudioGeometryComponent();
 
-    virtual void BeginPlay() override;
-
-#if WITH_EDITOR
     /**
      * Inherited from UActorComponent
      */
