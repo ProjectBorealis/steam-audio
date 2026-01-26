@@ -152,7 +152,6 @@ if (IPL_OS_WINDOWS)
         $<$<CONFIG:Release>:/LTCG>
         $<$<CONFIG:Release>:/MANIFEST:NO>
         $<IF:$<CONFIG:Release>,/INCREMENTAL:NO,/INCREMENTAL>
-        $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>
     )
 endif()
 
