@@ -47,11 +47,7 @@ FString FSteamAudioWwiseModule::GetDynamicLibraryPath(FString LibName)
 {
 	FString LibraryPath;
 
-#if PLATFORM_64BITS
 #define AK_WINDOWS_ARCHITECTURE "x64_"
-#else
-#define AK_WINDOWS_ARCHITECTURE "Win32_"
-#endif
 
 #if PLATFORM_WINDOWS
 #ifdef AK_WINDOWS_VS_VERSION

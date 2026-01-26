@@ -34,19 +34,13 @@ parser.add_argument('-t', '--toolchain', help="Compiler toolchain. (Windows only
 parser.add_argument(
     '--all-platforms', help="Copy binaries for all available platforms.", action='store_true')
 parser.add_argument(
-    '--windows-x86', help="Copy binaries used for Windows x86.", action='store_true')
-parser.add_argument(
     '--windows-x64', help="Copy binaries used for Windows x64.", action='store_true')
 parser.add_argument(
     '--arm-v7a', help="Copy binaries used for android ARM v7a.", action='store_true')
 parser.add_argument(
     '--arm-v8a', help="Copy binaries used for android ARM v8a.", action='store_true')
 parser.add_argument(
-    '--arm-x86', help="Copy binaries used for android x86.", action='store_true')
-parser.add_argument(
     '--osx', help="Copy binaries used for osx.", action='store_true')
-parser.add_argument(
-    '--linux-x86', help="Copy binaries used for Linux x86.", action='store_true')
 parser.add_argument(
     '--linux-x64', help="Copy binaries used for Linux x64.", action='store_true')
 parser.add_argument(
@@ -58,8 +52,11 @@ args = parser.parse_args()
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 lib_export_dir = "src/SteamAudioUnreal/Plugins/SteamAudio/Source/SteamAudioSDK/lib"
 
-platforms = {"windows_x86": "windows-x86", "windows_x64": "windows-x64", "linux_x86": "linux-x86",
-             "linux_x64": "linux-x64", "osx": "osx", "arm_v7a": "android/armeabi-v7a", "arm_v8a": "android/arm64-v8a", "arm_x86": "android/x86"}
+platforms = {"windows_x64": "windows-x64",
+             "linux_x64": "linux-x64",
+             "osx": "osx",
+             "arm_v7a": "android/armeabi-v7a",
+             "arm_v8a": "android/arm64-v8a"}
 
 platforms_to_use = set[str]()
 if args.all_platforms:
@@ -74,8 +71,7 @@ for platform in platforms_to_use:
     os.makedirs(os.path.join(lib_export_dir, platform), exist_ok=True)
 
 if args.source:
-    command = ["python", "get_dependencies.py",
-               "-t", args.toolchain, "--extra"]
+    command = ["python", "get_dependencies.py", "-t", args.toolchain]
     if args.configuration == "debug":
         command.append("--debug")
     ret = subprocess.call(command, cwd="../core/build")
@@ -133,9 +129,6 @@ else:
 
     print("Copying files...")
 
-    if "windows-x86" in platforms_to_use:
-        shutil.copy("steamaudio/lib/windows-x86/phonon.dll",
-                    os.path.join(lib_export_dir, "windows-x86"))
     if "windows-x64" in platforms_to_use:
         shutil.copy("steamaudio/lib/windows-x64/phonon.dll",
                     os.path.join(lib_export_dir, "windows-x64"))
@@ -143,9 +136,6 @@ else:
                     os.path.join(lib_export_dir, "windows-x64"))
         shutil.copy("steamaudio/lib/windows-x64/GPUUtilities.dll",
                     os.path.join(lib_export_dir, "windows-x64"))
-    if "linux-x86" in platforms_to_use:
-        shutil.copy("steamaudio/lib/linux-x86/libphonon.so",
-                    os.path.join(lib_export_dir, "linux-x86"))
     if "linux-x64" in platforms_to_use:
         shutil.copy("steamaudio/lib/linux-x64/libphonon.so",
                     os.path.join(lib_export_dir, "linux-x64"))
@@ -155,9 +145,6 @@ else:
     if "android/armeabi-v8a" in platforms_to_use:
         shutil.copy("steamaudio/lib/android-armv8/libphonon.so",
                     os.path.join(lib_export_dir, "android/armeabi-v8a"))
-    if "android/x86" in platforms_to_use:
-        shutil.copy("steamaudio/lib/android-x86/libphonon.so",
-                    os.path.join(lib_export_dir, "android/x86"))
 
     if "osx" in platforms_to_use:
         osx_phonon_dest = os.path.join(lib_export_dir, "osx", "phonon.bundle")
